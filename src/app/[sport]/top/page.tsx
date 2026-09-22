@@ -9,6 +9,7 @@ import { GROUP_LABEL, hitOf, TOP_CAPS, type Group } from "@/lib/markets";
 import { SPORTS, SPORT_ENUM, SPORT_IDS, type SportId } from "@/lib/sports";
 import { dayKey, fmtUtc, fmtWat, watDayStart } from "@/lib/time";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { FilterSelect } from "@/components/FilterSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { AddToSlip } from "@/components/AddToSlip";
@@ -114,9 +115,9 @@ export default async function Top({ params, searchParams }: { params: Promise<{ 
       <nav data-no-ptr aria-label="Time window" className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
         {WINDOWS.map((d) => <Link key={d} href={href({ days: d })}><Chip active={d === days}>{windowLabel(d)}</Chip></Link>)}
       </nav>
-      <div data-no-ptr className="-mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
-        <Link href={href({ market: null })}><Chip active={!group}>All markets</Chip></Link>
-        {GROUPS.map((g) => <Link key={g} href={href({ market: g })}><Chip active={group === g}>{all ? GROUP_LABEL[g] : gname(g, sport)}</Chip></Link>)}
+      <div data-no-ptr className="mb-5 max-w-xs">
+        <FilterSelect label="Market" value={group ?? "all"}
+          options={[{ value: "all", label: "All markets", href: href({ market: null }) }, ...GROUPS.map((g) => ({ value: g, label: all ? GROUP_LABEL[g] : gname(g, sport), href: href({ market: g }) }))]} />
       </div>
 
       {shown === 0 ? (

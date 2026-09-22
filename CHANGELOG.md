@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.3 — calmer screens, steadier syncs
+- **Dropdown filters** instead of long chip rows: league on the board (grouped by country — useful now that a paid plan brings 30+ leagues) and market on Top 20. Sport, time window and Most likely / Best value stay as buttons.
+- **Markets on a game page are collapsible**: Win and Total open by default; each closed section shows how many markets it holds and the best probability. Keeps a 40-market page short.
+- **Rate limits handled properly** on the free sources: a 429 now waits for the provider's own window (Retry-After, else a full minute) instead of retrying after two seconds.
+- README on GitHub: sync commands, key changes (Settings and `.env`), every `.env` setting, updating, access code, and a troubleshooting table.
+
 ## 0.7.2
 - Fix: API-Sports lists a league's seasons in no particular order and often doesn't flag the current one, so EdgeBoard was syncing an old season (NBA 2025-26 as "current", and much older seasons elsewhere). Seasons are now sorted by year: the flagged season if there is one, otherwise the latest, with the one before it as history.
 - `sourcecheck` now says exactly why a sport has no source: switched off, set to API-Sports without a key, or missing balldontlie key.

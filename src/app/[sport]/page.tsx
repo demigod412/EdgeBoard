@@ -9,6 +9,7 @@ import { SPORT_ENUM } from "@/lib/sports";
 import { picksOf, type Pick } from "@/lib/picks";
 import { DateNav } from "@/components/DateNav";
 import { GameList } from "@/components/GameList";
+import { FilterSelect } from "@/components/FilterSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Chip } from "@/components/ui";
@@ -49,8 +50,9 @@ export default async function Board({ params, searchParams }: { params: Promise<
       <DateNav active={date} base={`/${sport}`} extra={`${sp.league ? `&league=${sp.league}` : ""}${view !== "best" ? `&view=${view}` : ""}`} />
       {leagues.length > 1 && (
         <div data-no-ptr className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
-          <Link href={q({ league: undefined })}><Chip active={!sp.league}>All leagues</Chip></Link>
-          {leagues.map((l) => <Link key={l.id} href={q({ league: l.id })}><Chip active={sp.league === l.id}>{l.name}</Chip></Link>)}
+          <FilterSelect label="League" value={sp.league ?? "all"}
+            options={[{ value: "all", label: `All leagues (${leagues.length})`, href: q({ league: undefined }) },
+              ...leagues.map((l) => ({ value: l.id, label: l.name, group: l.country ?? undefined, href: q({ league: l.id }) }))]} />
         </div>
       )}
       <div data-no-ptr className="mb-5 flex gap-1.5 overflow-x-auto pb-1">

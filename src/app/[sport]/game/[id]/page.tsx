@@ -115,14 +115,17 @@ export default async function GamePage({ params }: { params: Promise<{ sport: Sp
       {p && (
         <Card className="mt-4">
           <SectionTitle aside="model probability · specials not yet calibrated">All markets</SectionTitle>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {GROUPS.map((grp) => {
               const rows = markets.filter((m) => m.group === grp);
               if (!rows.length) return null;
               return (
-                <div key={grp}>
-                  <div className="mb-1 text-[11px] text-slate-500">{gname(grp)}</div>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                <details key={grp} open={["win", "total"].includes(grp)} className="rounded-xl border hairline bg-white/[0.02] px-3 py-2 [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1 text-[12px] text-slate-300">
+                    <span>{gname(grp)} <span className="text-slate-500">({rows.length})</span></span>
+                    <span className="num text-[11px] text-slate-500">best {pct(Math.max(...rows.map((m) => m.p)))}</span>
+                  </summary>
+                  <div className="grid grid-cols-2 gap-1.5 pt-2 sm:grid-cols-3">
                     {rows.map((m) => {
                       const h = result ? hitOf(m, result) : null, o = oddsFor(m, lines);
                       return (
@@ -140,7 +143,7 @@ export default async function GamePage({ params }: { params: Promise<{ sport: Sp
                       );
                     })}
                   </div>
-                </div>
+                </details>
               );
             })}
           </div>

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.1
+- Fix: calibration for live predictions was being fitted from the demo ledger too. It now uses live locked calls from the active source only (identity until 50 settled live calls). The next sync replaces the old maps and re-predicts upcoming games.
+
 ## 0.4.0 — free live data
 - **Free official sources, chosen per sport in Settings → Data source (default):**
   - Baseball → **MLB Stats API** (no key): current season, innings (F5, 1st inning for NRFI, extras) and **probable pitchers** — games with both starters announced count as "news confirmed", so baseball calls can now reach High confidence.

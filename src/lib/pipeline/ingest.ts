@@ -70,7 +70,7 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
     }
     report.locked = await lockDue(db, now);
     report.settled = await settle(db, sport);
-    report.calibrationRows = await refitCalibration(db, sport);
+    report.calibrationRows = await refitCalibration(db, sport, SRC);
     await db.syncLog.update({ where: { id: log.id }, data: { ok: true, finishedAt: new Date(), message: JSON.stringify(report).slice(0, 2000) } });
     return report;
   } catch (e) {

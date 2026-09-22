@@ -63,8 +63,9 @@ export async function settle(db: PrismaClient, sport?: SportId) {
 }
 
 /** Refit calibration per market from locked + settled predictions. */
-export async function refitCalibration(db: PrismaClient, sport: SportId) {
-  const rows = await db.prediction.findMany({ where: { sport: SPORT_ENUM[sport], modelVersion: MODEL_VERSION, lockedAt: { not: null }, game: { results: { some: {} } } }, include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 } } } } });
+/** Live calibration is fitted from LIVE calls only (demo games never influence live probabilities). */
+export async function refitCalibration(db: PrismaClient, sport: SportId, source: "API_SPORTS" | "OPEN") {
+  const rows = await db.prediction.findMany({ where: { sport: SPORT_ENUM[sport], modelVersion: MODEL_VERSION, lockedAt: { not: null }, game: { source, results: { some: {} } } }, include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 } } } } });
   const data: Record<string, { p: number[]; y: (0 | 1)[] }> = { win: { p: [], y: [] }, total: { p: [], y: [] }, spread: { p: [], y: [] }, seg_total: { p: [], y: [] } };
   for (const r of rows) {
     const res = r.game.results[0]; if (!res) continue;

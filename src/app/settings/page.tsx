@@ -3,13 +3,14 @@ import { getSetting, secretSource, SECRET_NAMES } from "@/lib/secrets";
 import { DEFAULT_FLOORS, type Floors } from "@/lib/picks";
 import { TZ } from "@/lib/time";
 import { isAdmin } from "./actions";
-import { FloorsForm, KeysForm, UnlockForm } from "./forms";
+import { AccessCodeForm, FloorsForm, KeysForm, UnlockForm } from "./forms";
 export const metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
 export default async function Settings() {
   const admin = await isAdmin();
   const sources = Object.fromEntries(await Promise.all(SECRET_NAMES.map(async (n) => [n, await secretSource(n)] as const)));
   const floors = { ...DEFAULT_FLOORS, ...(await getSetting<Partial<Floors>>("floors", {})) };
+  const codeSet = (await getSetting<unknown>("accessCode", null)) != null;
   const choice = await getSetting<Record<string, string>>("sources", {});
   const enabled = await getSetting<Record<string, boolean>>("sportsEnabled", { basketball: true, baseball: true, hockey: true });
   return (
@@ -22,6 +23,10 @@ export default async function Settings() {
         {admin ? <FloorsForm floors={floors} /> : <p className="text-sm text-slate-400">Strong floor <span className="num">{floors.strong}</span>, safe floor <span className="num">{floors.safe}</span>. Unlock to edit.</p>}
         <p className="mt-3 text-xs text-slate-500">New floors apply to scanners immediately and to strong-line picks from the next prediction run.</p></Card>
       <Card><SectionTitle>Display</SectionTitle><p className="text-sm text-slate-400">Start times in <span className="text-slate-200">{TZ}</span> with UTC underneath.</p></Card>
+      <Card className="mt-4">
+        <SectionTitle aside={codeSet ? "set" : "not set"}>Access code</SectionTitle>
+        {admin ? <AccessCodeForm isSet={codeSet} /> : <p className="text-xs text-slate-400">Unlock with your PIN above to set or change the access code.</p>}
+      </Card>
     </div>
   );
 }

@@ -75,3 +75,27 @@ describe("API-Sports league discovery", () => {
     expect(d[1]).toMatchObject({ season: "2026", prevSeason: "2025" });
   });
 });
+
+describe("access code", () => {
+  it("token verifies, rejects a different secret and expires", async () => {
+    const { issueToken, readToken } = await import("@/lib/access");
+    const t = await issueToken("abc", 30);
+    expect((await readToken(t, "abc")).valid).toBe(true);
+    expect((await readToken(t, "xyz")).valid).toBe(false);
+    expect((await readToken(await issueToken("abc", -1), "abc")).valid).toBe(false);
+    expect((await readToken(undefined, "abc")).valid).toBe(false);
+  });
+  it("hashes the code and derives a secret that changes when the code changes", async () => {
+    const { makeHash, hashOf, secretFor } = await import("@/lib/accessSecret");
+    const a = makeHash("1234"), b = makeHash("1234");
+    expect(a.hash).not.toBe(b.hash);                       // salted
+    expect(hashOf("1234", a.salt)).toBe(a.hash);
+    expect(hashOf("wrong", a.salt)).not.toBe(a.hash);
+    expect(secretFor(a)).not.toBe(secretFor(makeHash("5678")));
+  });
+  it("leaves Settings and assets reachable while locked", async () => {
+    const { isOpenPath } = await import("@/lib/access");
+    for (const p of ["/settings", "/api/cron/ingest", "/_next/static/x.js", "/manifest.webmanifest"]) expect(isOpenPath(p)).toBe(true);
+    for (const p of ["/", "/basketball", "/basketball/top", "/slips"]) expect(isOpenPath(p)).toBe(false);
+  });
+});

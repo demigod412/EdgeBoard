@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 — access code, many more leagues
+- **Access code:** a full-screen prompt covers the app until the code is entered. Set, change or remove it in **Settings → Access code** (PIN-protected), which always stays reachable. It locks again after 30 minutes of inactivity, every page view extends the window, and "Lock this device now" is available. The code is stored hashed (salted scrypt); changing it signs every device out. After 5 wrong codes the form locks for 5 minutes, tracked on the server.
+- **Many more leagues when a sport uses API-Sports** (matched by country + name, so they work on any plan that includes them):
+  · basketball — NBA, WNBA, NCAA, EuroLeague, EuroCup, Basketball Champions League, ABA League, Spain, Turkey, Italy, Greece, France, Germany, Lithuania, Israel, Russia VTB, Poland, Serbia, Czechia, Croatia, Slovenia, Belgium/Netherlands BNXT, Portugal, Finland, Sweden, Denmark, Switzerland, Austria, Hungary, Romania, Bulgaria, Ukraine, Latvia, Estonia, Japan B.League, Korea KBL, Philippines PBA, China CBA, Australia and New Zealand NBL, Argentina, Brazil NBB, Mexico, Uruguay, Chile, Venezuela, Canada CEBL, Taiwan
+  · baseball — MLB, NPB, KBO, CPBL, Mexico (LMB and LMP), Dominican LIDOM, Venezuela LVBP, Puerto Rico, Colombia, Panama, Nicaragua, Cuba, Australia ABL, Netherlands, Italy, China, MiLB
+  · hockey — NHL, KHL, SHL, Liiga, DEL and DEL2, Czech Extraliga, Swiss National and Swiss League, AHL, ECHL, Austria ICE, Slovakia, Norway, Denmark, Poland, Latvia, Belarus, Kazakhstan, France, Italy, UK EIHL, HockeyAllsvenskan, Mestis, Hungary, Romania, Asia League
+- Free sources still cover NBA, WNBA, MLB and NHL; the extra leagues need a paid API-Sports plan for that sport.
+
 ## 0.6.0 — realistic total lines, Over and Under on every line
 - **Main total line** (game total and 1st half / F5 / 1st period): the bookmaker's line when odds are known; otherwise the line a bookmaker would post — the .5 line closest to a 50/50 split (the median, not the league average, which is what made lines look far off).
 - **Offered lines, Over and Under on each:** basketball main ±4 / ±8 / ±12 (1st half ±3 / ±6) · baseball main ±1 / ±2 (F5 ±1) · hockey main −1…+2 (1st period ±1). Shown under All markets, in Blend and slips.

@@ -81,11 +81,35 @@ export function parseOdds(sport: SportId, resp: AnyObj[]): PLines {
 
 /** Top leagues wanted per sport: [country, league-name pattern, focus]. Only those on your plan are used. */
 export const WANTED: Record<SportId, [string, RegExp, boolean?][]> = {
-  basketball: [["USA", /^NBA$/i, true], ["USA", /^WNBA$/i, true], ["Europe", /^Euroleague$/i, true], ["Europe", /^Eurocup$/i], ["Spain", /^ACB$/i], ["Turkey", /^Super Lig/i],
-    ["Italy", /^Lega A$|^Serie A$/i], ["Greece", /^Basket League$|^A1$/i], ["France", /^LNB$|^Pro A$|^Betclic Elite$/i], ["Germany", /^BBL$/i], ["Australia", /^NBL$/i], ["China", /^CBA$/i], ["Lithuania", /^LKL$/i]],
-  baseball: [["USA", /^MLB$/i, true], ["Japan", /^NPB$/i, true], ["South-Korea", /^KBO$/i, true], ["Taiwan", /^CPBL$/i], ["Mexico", /^LMB$/i]],
-  hockey: [["USA", /^NHL$/i, true], ["Russia", /^KHL$/i, true], ["Sweden", /^SHL$/i, true], ["Finland", /^Liiga$/i], ["Germany", /^DEL$/i],
-    ["Czech-Republic", /^Extraliga$/i], ["Switzerland", /^National League$/i], ["USA", /^AHL$/i]],
+  basketball: [
+    ["USA", /^NBA$/i, true], ["USA", /^WNBA$/i, true], ["USA", /^NCAA(\b|$)/i],
+    ["Europe", /^Euroleague$/i, true], ["Europe", /^Eurocup$/i], ["Europe", /^Champions League$/i], ["Europe", /^ABA League$|^Adriatic League$/i],
+    ["Spain", /^ACB$|^Liga Endesa$/i], ["Turkey", /^Super Lig|^BSL$/i], ["Italy", /^Lega A$|^Serie A$/i], ["Greece", /^Basket League$|^A1$/i],
+    ["France", /^LNB$|^Pro A$|^Betclic Elite$/i], ["Germany", /^BBL$/i], ["Lithuania", /^LKL$/i], ["Israel", /^Super League$|^Winner League$/i],
+    ["Russia", /^VTB United League$|^Super League$/i], ["Poland", /^(PLK|Energa Basket Liga|Superliga)$/i], ["Serbia", /^Super League$|^KLS$/i],
+    ["Czech-Republic", /^NBL$/i], ["Croatia", /^Premijer liga$|^A1 Liga$/i], ["Slovenia", /^Liga Nova KBM$|^Premier A$/i], ["Belgium", /^BNXT League$|^Pro Basketball League$/i],
+    ["Portugal", /^LPB$|^Proliga$/i], ["Netherlands", /^DBL$|^BNXT League$/i], ["Finland", /^Korisliiga$/i], ["Sweden", /^Basketligan$/i], ["Denmark", /^Basketligaen$/i],
+    ["Switzerland", /^SB League$/i], ["Austria", /^Superliga$|^Basketball Bundesliga$/i], ["Hungary", /^NB I\.? A$/i], ["Romania", /^Divizia A$|^Liga Nationala$/i],
+    ["Bulgaria", /^NBL$/i], ["Ukraine", /^Superleague$/i], ["Latvia", /^LBL$/i], ["Estonia", /^KML$/i],
+    ["Japan", /^B\.?League$/i], ["South-Korea", /^KBL$/i], ["Philippines", /^PBA$/i], ["China", /^CBA$/i], ["Australia", /^NBL$/i], ["New-Zealand", /^NBL$/i],
+    ["Argentina", /^Liga A$|^Liga Nacional$/i], ["Brazil", /^NBB$/i], ["Mexico", /^LNBP$/i], ["Uruguay", /^Liga Uruguaya$|^LUB$/i], ["Chile", /^LNB$/i], ["Venezuela", /^Superliga$/i],
+    ["Canada", /^CEBL$/i], ["Taiwan", /^(P\.? ?LEAGUE\+?|T1 League)$/i],
+  ],
+  baseball: [
+    ["USA", /^MLB$/i, true], ["Japan", /^NPB$/i, true], ["South-Korea", /^KBO$/i, true], ["Taiwan", /^CPBL$/i], ["Mexico", /^LMB$/i], ["Mexico", /^LMP$/i],
+    ["Dominican-Republic", /^LIDOM$/i], ["Venezuela", /^LVBP$/i], ["Puerto-Rico", /^LBPRC$|^Liga de B(é|e)isbol/i], ["Colombia", /^LCBP$|^Liga Colombiana/i],
+    ["Panama", /^Probeis$/i], ["Nicaragua", /^LBPN$/i], ["Cuba", /^Serie Nacional$/i], ["Australia", /^ABL$/i], ["Netherlands", /^Hoofdklasse$/i], ["Italy", /^Serie A$/i],
+    ["China", /^CBL$/i], ["USA", /^MiLB$|^Minor League/i],
+  ],
+  hockey: [
+    ["USA", /^NHL$/i, true], ["Russia", /^KHL$/i, true], ["Sweden", /^SHL$/i, true], ["Finland", /^Liiga$/i, true], ["Germany", /^DEL$/i],
+    ["Czech-Republic", /^Extraliga$|^Chance Liga$/i], ["Switzerland", /^National League$/i], ["USA", /^AHL$/i], ["USA", /^ECHL$/i],
+    ["Austria", /^(ICE Hockey League|EBEL|Bundesliga)$/i], ["Slovakia", /^Extraliga$/i], ["Norway", /^Eliteserien$|^Fjordkraft-ligaen$/i], ["Denmark", /^Metal Ligaen$|^Superisligaen$/i],
+    ["Poland", /^Polska Hokej Liga$|^PHL$/i], ["Latvia", /^Optibet Hokeja Liga$|^OHL$/i], ["Belarus", /^Extraleague$/i], ["Kazakhstan", /^Championship$|^Pro Hokei Ligasy$/i],
+    ["France", /^Ligue Magnus$/i], ["Italy", /^(Alps Hockey League|IHL|Serie A)$/i], ["United-Kingdom", /^EIHL$|^Elite League$/i], ["Sweden", /^HockeyAllsvenskan$/i],
+    ["Finland", /^Mestis$/i], ["Switzerland", /^Swiss League$/i], ["Germany", /^DEL2$/i], ["Hungary", /^Erste Liga$/i], ["Romania", /^Liga Nationala$/i],
+    ["Japan", /^Asia League$/i], ["China", /^Asia League$/i],
+  ],
 };
 
 export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: string }): SportProvider {

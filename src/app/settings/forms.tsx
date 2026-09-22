@@ -17,10 +17,10 @@ export function UnlockForm() {
   );
 }
 
-export function KeysForm({ sources, enabled }: { sources: Record<string, string>; enabled: Record<string, boolean> }) {
+export function KeysForm({ sources, enabled, choice }: { sources: Record<string, string>; enabled: Record<string, boolean>; choice: Record<string, string> }) {
   const [s, act, pending] = useActionState(saveKeys, null);
   const [t, test, testing] = useActionState(testConnection, null);
-  const keys = [["API_SPORTS_KEY", "API-Sports key (basketball, baseball, hockey)"], ["RAPIDAPI_KEY", "Or: RapidAPI key"], ["OPENAI_API_KEY", "OpenAI key (rationale wording only)"]];
+  const keys = [["BALLDONTLIE_API_KEY", "balldontlie key (free NBA data — app.balldontlie.io)"], ["API_SPORTS_KEY", "API-Sports key (paid plan for current seasons)"], ["RAPIDAPI_KEY", "Or: RapidAPI key for API-Sports"], ["OPENAI_API_KEY", "OpenAI key (rationale wording only)"]];
   return (
     <div className="space-y-4">
       <form action={act} className="space-y-3">
@@ -30,6 +30,15 @@ export function KeysForm({ sources, enabled }: { sources: Record<string, string>
             <input name={k} type="password" autoComplete="off" disabled={sources[k] === "env"} placeholder={sources[k] !== "none" ? "•••••••• (leave blank to keep)" : "Paste key"} className={input} />
           </label>
         ))}
+        <fieldset className="space-y-2 text-sm"><legend className="mb-1 text-xs text-slate-400">Data source per sport</legend>
+          {[["basketball", "Basketball", "Free: balldontlie (NBA)"], ["baseball", "Baseball", "Free: MLB Stats API (MLB, probable pitchers)"], ["hockey", "Ice hockey", "Free: NHL API (NHL)"]].map(([sp, label, free]) => (
+            <label key={sp} className="flex flex-wrap items-center justify-between gap-2"><span>{label}</span>
+              <select name={`source_${sp}`} defaultValue={choice[sp] ?? "open"} className="focus-ring rounded-lg border hairline bg-black/30 px-2 py-1.5 text-xs text-slate-100">
+                <option value="open">{free}</option><option value="api-sports">API-Sports (paid: odds + more leagues)</option>
+              </select>
+            </label>
+          ))}
+        </fieldset>
         <fieldset className="flex flex-wrap gap-4 text-sm"><legend className="mb-1 text-xs text-slate-400">Sports to sync</legend>
           {["basketball", "baseball", "hockey"].map((sp) => <label key={sp} className="flex items-center gap-2 capitalize"><input type="checkbox" name={`enable_${sp}`} defaultChecked={enabled[sp] !== false} className="accent-[#C8F542]" />{sp === "hockey" ? "Ice hockey" : sp}</label>)}
         </fieldset>

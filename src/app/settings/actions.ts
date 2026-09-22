@@ -29,6 +29,8 @@ export async function saveKeys(_: ActionState, fd: FormData): Promise<ActionStat
     }
     const enabled = Object.fromEntries(SPORT_IDS.map((sp) => [sp, fd.get(`enable_${sp}`) === "on"]));
     await setSetting("sportsEnabled", enabled);
+    const choice = Object.fromEntries(SPORT_IDS.map((sp) => [sp, fd.get(`source_${sp}`) === "api-sports" ? "api-sports" : "open"]));
+    await setSetting("sources", choice);
     revalidatePath("/", "layout");
     return { ok: true, message: "Saved. Keys are encrypted server-side and never sent back to the browser." };
   } catch (e) { return { ok: false, message: (e as Error).message }; }

@@ -18,6 +18,7 @@ enum Sport {
 enum Source {
   DEMO
   API_SPORTS
+  OPEN // free official sources: MLB Stats API, NHL API, balldontlie (NBA)
 }
 enum GameStatus {
   SCHEDULED
@@ -85,6 +86,7 @@ model Game {
   awayReg     Int?
   extraTime   Boolean    @default(false)
   homeFirst   Int?       // baseball: runs in the 1st inning (NRFI)
+  newsReady   Boolean    @default(false) // team news confirmed (MLB: both probable pitchers announced)
   awayFirst   Int?
   lines       MarketLine[]
   predictions Prediction[]

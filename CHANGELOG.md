@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — free live data
+- **Free official sources, chosen per sport in Settings → Data source (default):**
+  - Baseball → **MLB Stats API** (no key): current season, innings (F5, 1st inning for NRFI, extras) and **probable pitchers** — games with both starters announced count as "news confirmed", so baseball calls can now reach High confidence.
+  - Ice hockey → **NHL API** (no key): current season, OT/shootout, regulation scores; 1st-period scores back-filled from the daily score feed (25 dates per sync).
+  - Basketball → **balldontlie** (free key): NBA games with quarter scores (1st half, regulation, OT).
+- API-Sports stays available per sport (paid plan: bookmaker odds, more leagues). Value features need odds, so they stay empty on free sources.
+- New `npm run sourcecheck` tests each sport's live source on the server.
+- Leagues and games from free sources are stored under source `OPEN`; demo and API-Sports data are untouched.
+
 ## 0.3.1
 - **Blend builder** (Scanners → Blend): pick any market on any game (mixed markets, one per game), see combined probability and fair odds, **Copy blend text**, or get a **Sportybet code** with **Copy code** and Open on Sportybet.
 - **Copy to clipboard** on slips: Copy code and Copy text, with a phone-friendly fallback and "Copied" confirmation.

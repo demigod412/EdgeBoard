@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { fitBinary } from "../model/calibration";
 import { MODEL_VERSION } from "../model/constants";
 import { SPORT_ENUM, type SportId } from "../sports";
-import type { SportProvider } from "../providers/apiSports";
+import type { SportProvider } from "../providers/types";
 
 const LOCK_MIN = Number(process.env.PREDICTION_LOCK_MINUTES ?? 15);
 
@@ -29,16 +29,16 @@ export async function lockDue(db: PrismaClient, now = new Date()) {
 export async function syncResults(db: PrismaClient, p: SportProvider, now = new Date()) {
   const S = SPORT_ENUM[p.sport];
   const minutes = p.sport === "baseball" ? 200 : p.sport === "hockey" ? 160 : 150;
-  const pending = await db.game.findMany({ where: { sport: S, source: "API_SPORTS", status: { in: ["SCHEDULED", "LIVE"] }, startUtc: { lte: new Date(now.getTime() - minutes * 60_000), gte: new Date(now.getTime() - 3 * 86_400_000) } }, select: { startUtc: true } });
+  const pending = await db.game.findMany({ where: { sport: S, source: p.source, status: { in: ["SCHEDULED", "LIVE"] }, startUtc: { lte: new Date(now.getTime() - minutes * 60_000), gte: new Date(now.getTime() - 3 * 86_400_000) } }, select: { startUtc: true } });
   if (!pending.length) return { checked: 0, updated: 0 };
   const dates = [...new Set(pending.map((g) => g.startUtc.toISOString().slice(0, 10)))];
   let updated = 0;
   for (const date of dates) {
     for (const g of await p.gamesOn(date)) {
       if (g.homeScore == null || g.awayScore == null) continue;
-      const u = await db.game.updateMany({ where: { sport: S, source: "API_SPORTS", externalId: g.externalId }, data: {
-        status: g.status, homeScore: g.homeScore, awayScore: g.awayScore, homeReg: g.homeReg, awayReg: g.awayReg, homeSeg: g.homeSeg, awaySeg: g.awaySeg, extraTime: g.extraTime,
-        ...(g.homeFirst != null ? { homeFirst: g.homeFirst, awayFirst: g.awayFirst } : {}) } });
+      const u = await db.game.updateMany({ where: { sport: S, source: p.source, externalId: g.externalId }, data: {
+        status: g.status, homeScore: g.homeScore, awayScore: g.awayScore, homeReg: g.homeReg, awayReg: g.awayReg, extraTime: g.extraTime,
+        ...(g.homeFirst != null ? { homeFirst: g.homeFirst, awayFirst: g.awayFirst } : {}), ...(g.homeSeg == null ? {} : { homeSeg: g.homeSeg, awaySeg: g.awaySeg }) } });
       updated += u.count;
     }
   }

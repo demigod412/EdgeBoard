@@ -8,9 +8,9 @@ Basketball, baseball and ice-hockey probabilities in one PWA: win, totals, handi
 
 **2. Put the code on GitHub:** create an empty repo (e.g. `EdgeBoard`), then on the server:
 ```bash
-cd ~ && rm -rf /tmp/eb && unzip -q edgeboard-v0.3.1.zip -d /tmp/eb
+cd ~ && rm -rf /tmp/eb && unzip -q edgeboard-v0.4.0.zip -d /tmp/eb
 mkdir -p ~/EdgeBoard && rsync -a /tmp/eb/edgeboard/ ~/EdgeBoard/
-cd ~/EdgeBoard && git init -b main && git add -A && git commit -m "EdgeBoard v0.3.1"
+cd ~/EdgeBoard && git init -b main && git add -A && git commit -m "EdgeBoard v0.4.0"
 git remote add origin https://github.com/<you>/EdgeBoard.git && git push -u origin main
 ```
 (Or later on any machine: `git clone https://github.com/<you>/EdgeBoard.git`.)
@@ -38,4 +38,7 @@ cd /var/www/edgeboard && sudo -u ubuntu npm run selfcheck          # ledger chec
 tail -f /var/log/edgeboard-cron.log
 ```
 Cron: sync each sport every 3 h (separate process), lock every 5 min, results every 15 min.
-Data: one API-Sports key covers basketball, baseball and hockey (each sport has its own daily quota; free = 100 requests/day).
+Data (Settings → Data source, per sport):
+- Baseball: MLB Stats API (free, no key) · Ice hockey: NHL API (free, no key) · Basketball: balldontlie (free key from app.balldontlie.io)
+- Or API-Sports (paid plan needed for current seasons) for bookmaker odds and more leagues.
+Check sources on the server: `cd /var/www/<app> && sudo -u ubuntu npm run sourcecheck`

@@ -4,15 +4,8 @@ import { SPORTS, type SportId } from "../sports";
 
 /* One adapter for API-Sports basketball / baseball / hockey (v1). Same key works across sports on paid plans;
    each sport has its own free plan quota (≈100 requests/day). */
-export type PStatus = "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED";
-export interface PTeam { externalId: string; name: string; logoUrl?: string }
-export interface PGame {
-  externalId: string; leagueExternalId: string; startUtc: Date; status: PStatus; home: PTeam; away: PTeam;
-  homeScore: number | null; awayScore: number | null; homeReg: number | null; awayReg: number | null;
-  homeSeg: number | null; awaySeg: number | null; extraTime: boolean;
-  homeFirst?: number | null; awayFirst?: number | null;
-}
-export interface PLines { total?: number; spread?: number; seg?: number; moneyline?: [number, number]; bookmaker?: string; prices?: Record<string, [number, number]> }
+import type { PGame, PLines, PStatus, SportProvider } from "./types";
+export type { PGame, PLines, SportProvider } from "./types";
 
 type AnyObj = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const n = (v: unknown) => (v == null || v === "" ? null : Number(v));
@@ -86,7 +79,7 @@ export function parseOdds(sport: SportId, resp: AnyObj[]): PLines {
   return out;
 }
 
-export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: string }) {
+export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: string }): SportProvider {
   const base = process.env[`API_SPORTS_${sport.toUpperCase()}_URL`] ?? SPORTS[sport].apiBase;
   const host = new URL(base).host;
   const headers: Record<string, string> = opts.rapidKey ? { "x-rapidapi-key": opts.rapidKey, "x-rapidapi-host": host } : { "x-apisports-key": opts.key ?? "" };
@@ -96,19 +89,18 @@ export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: strin
     if (errs.length) throw new Error(`api-sports ${sport}: ${errs.join("; ")}`);
     return r.response;
   };
+  const cfg = SPORTS[sport];
   return {
-    sport,
+    sport, source: "API_SPORTS", name: "API-Sports", leagues: cfg.leagues,
+    season: (now: Date) => cfg.season(now),
+    prevSeason: (season: string) => (/-/.test(season) ? season.split("-").map((y) => String(Number(y) - 1)).join("-") : String(Number(season) - 1)),
     /** Whole league-season in one request — keeps free-plan usage low. */
     async seasonGames(leagueId: string, season: string): Promise<PGame[]> { return (await get(`/games?${qs({ league: leagueId, season })}`)).map((g) => parse(sport, g)); },
     async gamesOn(date: string): Promise<PGame[]> { return (await get(`/games?${qs({ date, timezone: "UTC" })}`)).map((g) => parse(sport, g)); },
-    async game(id: string): Promise<PGame | null> { const r = await get(`/games?id=${id}`); return r[0] ? parse(sport, r[0]) : null; },
-    async h2h(homeId: string, awayId: string): Promise<PGame[]> { return (await get(`/games?h2h=${homeId}-${awayId}`)).map((g) => parse(sport, g)); },
     async odds(gameId: string): Promise<PLines> { return parseOdds(sport, await get(`/odds?game=${gameId}`)); },
-    async leagues() { return get(`/leagues`); },
     async testConnection() {
       try { const r = await fetchJson<{ response: AnyObj }>(`api-sports-${sport}`, `${base}/status`, headers); const q = r.response?.requests; return { ok: true, message: q ? `${SPORTS[sport].name}: ${q.current}/${q.limit_day} requests today` : `${SPORTS[sport].name}: connected` }; }
       catch (e) { return { ok: false, message: `${SPORTS[sport].name}: ${(e as Error).message}` }; }
     },
   };
 }
-export type SportProvider = ReturnType<typeof apiSports>;

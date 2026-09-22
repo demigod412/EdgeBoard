@@ -1,6 +1,6 @@
 {
   "name": "edgeboard",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -15,7 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "ingest": "node --env-file=.env --conditions=react-server --import tsx scripts/ingest.ts",
     "backtest": "tsx scripts/backtest-synthetic.ts",
-    "selfcheck": "node --env-file=.env --conditions=react-server --import tsx scripts/selfcheck.ts"
+    "selfcheck": "node --env-file=.env --conditions=react-server --import tsx scripts/selfcheck.ts",
+    "sourcecheck": "node --env-file=.env --conditions=react-server --import tsx scripts/sourcecheck.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

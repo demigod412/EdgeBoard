@@ -2,7 +2,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "./db";
 
-export const SECRET_NAMES = ["API_SPORTS_KEY", "RAPIDAPI_KEY", "OPENAI_API_KEY"] as const;
+export const SECRET_NAMES = ["API_SPORTS_KEY", "RAPIDAPI_KEY", "BALLDONTLIE_API_KEY", "OPENAI_API_KEY"] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 
 function key() {

@@ -16,7 +16,7 @@ const LOCK = Number(process.env.PREDICTION_LOCK_MINUTES ?? 15);
 let failures = 0;
 const check = (name: string, ok: boolean, info = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${info ? ` — ${info}` : ""}`); if (!ok) failures++; };
 
-async function ledger(sport: SportId, source: "DEMO" | "API_SPORTS") {
+async function ledger(sport: SportId, source: "DEMO" | "API_SPORTS" | "OPEN") {
   const S = SPORT_ENUM[sport];
   const locked = await db.prediction.findMany({ where: { sport: S, lockedAt: { not: null }, game: { source } }, include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 } } } } });
   const per = new Map<string, number>(); let late = 0, gen = 0;
@@ -43,7 +43,7 @@ async function ledger(sport: SportId, source: "DEMO" | "API_SPORTS") {
   check("lock job runs", true, `${await lockDue(db)} newly locked`);
   for (const s of SPORT_IDS) {
     const st = await settle(db, s); check(`${s}: settle runs`, true, `${st.created} new, ${st.corrected} corrections`);
-    for (const src of ["API_SPORTS", "DEMO"] as const) if (await db.league.count({ where: { sport: SPORT_ENUM[s], source: src } })) await ledger(s, src);
+    for (const src of ["API_SPORTS", "OPEN", "DEMO"] as const) if (await db.league.count({ where: { sport: SPORT_ENUM[s], source: src } })) await ledger(s, src);
   }
   if (demo) {
     for (const s of SPORT_IDS) {

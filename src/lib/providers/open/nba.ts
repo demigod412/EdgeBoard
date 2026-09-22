@@ -41,27 +41,50 @@ export function parseBdl(g: BdlGame): PGame {
   };
 }
 type Page = { data: BdlGame[]; meta?: { next_cursor?: number | null } };
+/** The WNBA feed may name fields differently (home_score / away_team); map them onto the NBA shape. */
+function normWnba(g: BdlGame & { home_score?: number; away_score?: number; away_team?: BdlGame["visitor_team"] }): BdlGame {
+  return { ...g, visitor_team: g.visitor_team ?? g.away_team!, home_team_score: g.home_team_score ?? g.home_score, visitor_team_score: g.visitor_team_score ?? g.away_score };
+}
+
+/** balldontlie free tier ≈ 5 requests/minute: space EVERY request (not just pages) and wait out 429s. */
+let lastCall = 0;
+async function spaced<T>(fn: () => Promise<T>): Promise<T> {
+  const gap = Number(process.env.BALLDONTLIE_PAGE_DELAY_MS ?? 13_000);
+  for (let attempt = 0; ; attempt++) {
+    const wait = lastCall + gap - Date.now(); if (wait > 0) await sleep(wait);
+    lastCall = Date.now();
+    try { return await fn(); }
+    catch (e) { if (attempt < 3 && /429/.test((e as Error).message)) { await sleep(gap * 2); continue; } throw e; }
+  }
+}
 
 export function nbaOpen(key: string): SportProvider {
   const H = { Authorization: key };
-  const pages = async (query: string) => {
+  const base = (league: string) => (league === "WNBA" ? "https://api.balldontlie.io/wnba/v1" : BASE);
+  const pages = async (query: string, league = "NBA") => {
     const out: PGame[] = []; let cursor: number | null | undefined;
     for (let i = 0; i < 40; i++) {
-      const r = await getJson<Page>(`${BASE}/games?per_page=100&${query}${cursor ? `&cursor=${cursor}` : ""}`, H);
-      out.push(...r.data.map(parseBdl)); cursor = r.meta?.next_cursor;
+      let r: Page;
+      try { r = await spaced(() => getJson<Page>(`${base(league)}/games?per_page=100&${query}${cursor ? `&cursor=${cursor}` : ""}`, H)); }
+      catch (e) { if (league === "WNBA" && /HTTP 40[13]/.test((e as Error).message)) throw new Error("WNBA isn't included in your balldontlie plan"); throw e; }
+      out.push(...r.data.map((g) => ({ ...parseBdl(normWnba(g)), leagueExternalId: league }))); cursor = r.meta?.next_cursor;
       if (!cursor) break;
-      await sleep(Number(process.env.BALLDONTLIE_PAGE_DELAY_MS ?? 13_000)); // free tier ≈ 5 requests / minute
     }
     return out;
   };
   return {
-    sport: "basketball", source: "OPEN", name: "balldontlie", leagues: [{ id: "NBA", name: "NBA", focus: true }],
+    sport: "basketball", source: "OPEN", name: "balldontlie",
+    leagues: [{ id: "NBA", name: "NBA", focus: true }, { id: "WNBA", name: "WNBA", focus: true, season: String(new Date().getUTCFullYear()), prevSeason: String(new Date().getUTCFullYear() - 1) }],
     season: (now) => String(now.getUTCMonth() >= 8 ? now.getUTCFullYear() : now.getUTCFullYear() - 1),
     prevSeason: (s) => String(Number(s) - 1),
-    async seasonGames(_l, season) { return pages(`seasons[]=${season}`); },
-    async gamesOn(date) { return pages(`dates[]=${date}`); },
+    async seasonGames(league, season) { return pages(`seasons[]=${season}`, league); },
+    async gamesOn(date) {
+      const nba = await pages(`dates[]=${date}`, "NBA");
+      const wnba = await pages(`dates[]=${date}`, "WNBA").catch(() => [] as PGame[]);
+      return [...nba, ...wnba];
+    },
     async testConnection() {
-      try { await getJson<unknown>(`${BASE}/teams?per_page=1`, H); return { ok: true, message: "balldontlie: connected" }; }
+      try { await spaced(() => getJson<unknown>(`${BASE}/teams?per_page=1`, H)); return { ok: true, message: "balldontlie: connected" }; }
       catch (e) { return { ok: false, message: `balldontlie: ${(e as Error).message}` }; }
     },
   };

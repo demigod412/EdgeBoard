@@ -55,3 +55,23 @@ describe("balldontlie parsing", () => {
     expect(p.status).toBe("SCHEDULED"); expect(p.homeScore).toBeNull(); expect(p.startUtc.toISOString()).toBe("2026-10-23T00:00:00.000Z");
   });
 });
+
+import { vi } from "vitest";
+vi.mock("server-only", () => ({}));
+describe("API-Sports league discovery", () => {
+  it("picks wanted top leagues with their current and previous season", async () => {
+    const { apiSports } = await import("@/lib/providers/apiSports");
+    const leagues = [
+      { id: 12, name: "NBA", type: "League", country: { name: "USA" }, seasons: [{ season: "2024-2025" }, { season: "2025-2026" }, { season: "2026-2027", current: true }] },
+      { id: 13, name: "WNBA", type: "League", country: { name: "USA" }, seasons: [{ season: 2025 }, { season: 2026, current: true }] },
+      { id: 99, name: "NBA - G League", type: "League", country: { name: "USA" }, seasons: [{ season: "2026-2027", current: true }] },
+      { id: 120, name: "Euroleague", type: "League", country: { name: "Europe" }, seasons: [{ season: "2025-2026" }, { season: "2026-2027", current: true }] },
+      { id: 5, name: "Copa", type: "Cup", country: { name: "Spain" }, seasons: [] },
+    ];
+    globalThis.fetch = (async () => new Response(JSON.stringify({ response: leagues, errors: [] }), { status: 200 })) as typeof fetch;
+    const d = await apiSports("basketball", { key: "x" }).discoverLeagues!();
+    expect(d.map((l) => l.name)).toEqual(["NBA", "WNBA", "Euroleague"]);
+    expect(d[0]).toMatchObject({ id: "12", season: "2026-2027", prevSeason: "2025-2026", focus: true });
+    expect(d[1]).toMatchObject({ season: "2026", prevSeason: "2025" });
+  });
+});

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — more leagues, more run lines
+- **Alternative run lines (baseball) −4.5 … +4.5 and puck lines (hockey) −3.5 … +3.5**, both sides, on every game (All markets, Blend, slips, Top 20 handicap filter), priced from the same calibrated ladder.
+- **WNBA** added to the free basketball source (balldontlie; skipped with a clear message if your balldontlie plan doesn't include it).
+- **API-Sports league discovery:** when a sport uses API-Sports, EdgeBoard reads your plan's league list and syncs every available top league with its real current season —
+  basketball NBA, WNBA, EuroLeague, EuroCup, ACB, Turkish Super Lig, Lega A, Greek Basket League, LNB, BBL, NBL, CBA, LKL ·
+  baseball MLB, NPB, KBO, CPBL, LMB · hockey NHL, KHL, SHL, Liiga, DEL, Czech Extraliga, Swiss National League, AHL.
+- Fix: balldontlie free tier (≈5 requests/min) — every request is now spaced and 429s are waited out, so last season's history loads (it was silently skipped, leaving NBA with 0 games).
+- Sync reports now say when a previous season could not be loaded instead of skipping silently.
+
 ## 0.4.1
 - Fix: calibration for live predictions was being fitted from the demo ledger too. It now uses live locked calls from the active source only (identity until 50 settled live calls). The next sync replaces the old maps and re-predicts upcoming games.
 

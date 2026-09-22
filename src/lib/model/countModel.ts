@@ -182,9 +182,9 @@ export function predictCount(fit: CountFit, homeId: string, awayId: string, adj:
   };
 }
 
-export function countLadders(p: CountOut, cfg: { width: number; handicaps: number[] }) {
+export function countLadders(p: CountOut, cfg: { width: number; handicaps: number[]; alt?: number[] }) {
   const total: LadderRow[] = halfLines(p.fairTotal, 1, cfg.width).map((line) => ({ line, ...p.totalAt(line) }));
   const seg: LadderRow[] = halfLines(p.fairSeg, 1, Math.max(2, cfg.width)).map((line) => ({ line, ...p.segAt(line) }));
-  const spread: LadderRow[] = [-2.5, ...cfg.handicaps, 2.5].sort((a, b) => a - b).map((line) => ({ line, ...p.coverAt(line) }));
+  const spread: LadderRow[] = [...new Set([-2.5, ...cfg.handicaps, 2.5, ...(cfg.alt ?? [])])].sort((a, b) => a - b).map((line) => ({ line, ...p.coverAt(line) }));
   return { total, spread, seg };
 }

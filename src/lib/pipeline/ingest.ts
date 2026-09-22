@@ -13,12 +13,14 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
   const log = await db.syncLog.create({ data: { sport: S, job: "ingest", ok: false } });
   const report: Record<string, unknown> = {};
   try {
-    for (const L of p.leagues) {
-      const season = p.season(now);
+    let leagues = p.leagues;
+    if (p.discoverLeagues) { try { const d = await p.discoverLeagues(); if (d.length) leagues = d; } catch (e) { report.discovery = `using default leagues: ${(e as Error).message}`; } }
+    for (const L of leagues) {
+      const season = L.season ?? p.season(now);
       let games: PGame[] = [];
       try { games = await p.seasonGames(L.id, season); } catch (e) { report[L.name] = `skip: ${(e as Error).message}`; continue; }
       if (games.filter((g) => g.status === "FINISHED").length < 150) {
-        try { games = [...(await p.seasonGames(L.id, p.prevSeason(season))), ...games]; } catch { /* no previous season */ }
+        try { games = [...(await p.seasonGames(L.id, L.prevSeason ?? p.prevSeason(season))), ...games]; } catch (e) { report[`${L.name} previous season`] = `not loaded: ${(e as Error).message}`; }
       }
       if (!games.length) { report[L.name] = "no games"; continue; }
       const league = await db.league.upsert({

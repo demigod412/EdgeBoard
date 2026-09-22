@@ -11,12 +11,16 @@ export interface PGame {
 }
 export interface PLines { total?: number; spread?: number; seg?: number; moneyline?: [number, number]; bookmaker?: string; prices?: Record<string, [number, number]> }
 
+export interface LeagueRef { id: string; name: string; focus?: boolean; season?: string; prevSeason?: string }
+
 /** Every data source for EdgeBoard implements this. */
 export interface SportProvider {
   sport: SportId;
   source: "API_SPORTS" | "OPEN";
   name: string;
-  leagues: { id: string; name: string; focus?: boolean }[];
+  leagues: LeagueRef[];
+  /** Optional live league discovery (API-Sports): which of the wanted leagues exist on your plan, with their current season. */
+  discoverLeagues?(): Promise<LeagueRef[]>;
   season(now: Date): string;
   prevSeason(season: string): string;
   seasonGames(leagueId: string, season: string): Promise<PGame[]>;

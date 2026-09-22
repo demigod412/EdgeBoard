@@ -111,3 +111,17 @@ describe("specials from the model", () => {
     });
   }
 });
+
+describe("alternative run / puck lines", () => {
+  for (const sport of ["baseball", "hockey"] as const) {
+    it(`${sport}: every alt line priced for both sides, monotone`, () => {
+      const h = hist(sport), fit = fitCount(sport, h, new Date(Date.UTC(2025, 8, 1)));
+      const o = predictGame({ sport, fit, homeId: "t3", awayId: "t4", homeName: "H", awayName: "A", start: new Date(), restHomeDays: 2, restAwayDays: 2, newsComplete: true, book: {}, formHome: "", formAway: "" });
+      const home = o.picks.markets.filter((m) => m.kind === "spread" && m.side === "home").sort((a, b) => a.line! - b.line!);
+      const want = sport === "baseball" ? 8 : 6;
+      expect(home.length).toBeGreaterThanOrEqual(want);
+      for (let i = 1; i < home.length; i++) expect(home[i].p).toBeGreaterThanOrEqual(home[i - 1].p - 1e-9); // easier line ⇒ higher probability
+      expect(o.picks.markets.some((m) => m.kind === "spread" && m.side === "away" && m.line === 3.5)).toBe(true);
+    });
+  }
+});

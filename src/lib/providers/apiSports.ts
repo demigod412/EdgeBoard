@@ -4,7 +4,7 @@ import { SPORTS, type SportId } from "../sports";
 
 /* One adapter for API-Sports basketball / baseball / hockey (v1). Same key works across sports on paid plans;
    each sport has its own free plan quota (≈100 requests/day). */
-import type { PGame, PLines, PStatus, SportProvider } from "./types";
+import type { LeagueRef, PGame, PLines, PStatus, SportProvider } from "./types";
 export type { PGame, PLines, SportProvider } from "./types";
 
 type AnyObj = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -79,6 +79,15 @@ export function parseOdds(sport: SportId, resp: AnyObj[]): PLines {
   return out;
 }
 
+/** Top leagues wanted per sport: [country, league-name pattern, focus]. Only those on your plan are used. */
+export const WANTED: Record<SportId, [string, RegExp, boolean?][]> = {
+  basketball: [["USA", /^NBA$/i, true], ["USA", /^WNBA$/i, true], ["Europe", /^Euroleague$/i, true], ["Europe", /^Eurocup$/i], ["Spain", /^ACB$/i], ["Turkey", /^Super Lig/i],
+    ["Italy", /^Lega A$|^Serie A$/i], ["Greece", /^Basket League$|^A1$/i], ["France", /^LNB$|^Pro A$|^Betclic Elite$/i], ["Germany", /^BBL$/i], ["Australia", /^NBL$/i], ["China", /^CBA$/i], ["Lithuania", /^LKL$/i]],
+  baseball: [["USA", /^MLB$/i, true], ["Japan", /^NPB$/i, true], ["South-Korea", /^KBO$/i, true], ["Taiwan", /^CPBL$/i], ["Mexico", /^LMB$/i]],
+  hockey: [["USA", /^NHL$/i, true], ["Russia", /^KHL$/i, true], ["Sweden", /^SHL$/i, true], ["Finland", /^Liiga$/i], ["Germany", /^DEL$/i],
+    ["Czech-Republic", /^Extraliga$/i], ["Switzerland", /^National League$/i], ["USA", /^AHL$/i]],
+};
+
 export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: string }): SportProvider {
   const base = process.env[`API_SPORTS_${sport.toUpperCase()}_URL`] ?? SPORTS[sport].apiBase;
   const host = new URL(base).host;
@@ -94,6 +103,19 @@ export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: strin
     sport, source: "API_SPORTS", name: "API-Sports", leagues: cfg.leagues,
     season: (now: Date) => cfg.season(now),
     prevSeason: (season: string) => (/-/.test(season) ? season.split("-").map((y) => String(Number(y) - 1)).join("-") : String(Number(season) - 1)),
+    async discoverLeagues(): Promise<LeagueRef[]> {
+      type L = { id: number; name: string; type?: string; country?: { name?: string }; seasons?: { season: string | number; current?: boolean }[] };
+      const all = (await get(`/leagues`)) as unknown as L[];
+      const out: LeagueRef[] = [];
+      for (const [country, re, focus] of WANTED[sport]) {
+        const l = all.find((x) => (x.country?.name ?? "").toLowerCase() === country.toLowerCase() && re.test(x.name.trim()) && (x.type ?? "League") !== "Cup");
+        if (!l?.seasons?.length) continue;
+        const seasons = l.seasons.map((x) => ({ s: String(x.season), cur: !!x.current }));
+        const i = Math.max(0, seasons.findIndex((x) => x.cur) >= 0 ? seasons.findIndex((x) => x.cur) : seasons.length - 1);
+        out.push({ id: String(l.id), name: l.name, focus: !!focus, season: seasons[i].s, prevSeason: seasons[i - 1]?.s });
+      }
+      return out;
+    },
     /** Whole league-season in one request — keeps free-plan usage low. */
     async seasonGames(leagueId: string, season: string): Promise<PGame[]> { return (await get(`/games?${qs({ league: leagueId, season })}`)).map((g) => parse(sport, g)); },
     async gamesOn(date: string): Promise<PGame[]> { return (await get(`/games?${qs({ date, timezone: "UTC" })}`)).map((g) => parse(sport, g)); },

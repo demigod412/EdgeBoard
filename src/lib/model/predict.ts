@@ -59,7 +59,7 @@ export function predictGame(inp: PredictInput): PredictOutput {
     leagueTotal = 2 * inp.fit.mu;
   } else {
     out = predictCount(inp.fit, inp.homeId, inp.awayId, { phiHome: 1, phiAway: 1 });
-    lad = countLadders(out, { width: cfg.ladderWidth, handicaps: cfg.fixedHandicaps ?? [-1.5, 1.5] });
+    lad = countLadders(out, { width: cfg.ladderWidth, handicaps: cfg.fixedHandicaps ?? [-1.5, 1.5], alt: cfg.altHandicaps });
     leagueTotal = 2 * inp.fit.base * (1 + inp.fit.home) / 2;
     if (inp.fit.sport === "hockey" && inp.fit.enTransfer === 0) flags.push("no_empty_net_adjustment");
   }
@@ -147,6 +147,15 @@ export function predictGame(inp: PredictInput): PredictOutput {
   const fromStrong = (pk: Pick | null) => pk && mk({ group: pk.market === "seg" ? "seg" : pk.market === "total" ? "total" : "spread", kind: pk.market === "seg" ? "seg" : pk.market === "total" ? "total" : "spread",
     side: pk.side, line: pk.line, label: pk.market === "seg" ? pk.label.replace(`${U} `, `${segName} `) : pk.label, short: pk.label, p: pk.p, strong: true });
   for (const x of [fromStrong(strongTotal), fromStrong(strongSpread), fromStrong(strongSeg)]) if (x && !markets.some((m) => m.key === x.key)) markets.push(x);
+  // Alternative run / puck lines (both sides of every line), priced from the same calibrated ladder
+  if (cfg.altHandicaps) for (const r of ladders.spread) {
+    if (!cfg.altHandicaps.includes(r.line)) continue;
+    for (const side of ["home", "away"] as const) {
+      const line = side === "home" ? r.line : -r.line, p = side === "home" ? r.a : 1 - r.a - r.push;
+      const x = mk({ group: "spread", kind: "spread", side, line, label: `${side === "home" ? H : A} ${fmtLine(line)}`, short: `${side === "home" ? H : A} ${fmtLine(line)}`, p });
+      if (!markets.some((m) => m.key === x.key)) markets.push(x);
+    }
+  }
   const specials = inp.fit.kind === "normal" ? propsNormal(inp.fit, out as ReturnType<typeof predictNormal>, H, A, floor)
     : propsCount(inp.sport, inp.fit, out as ReturnType<typeof predictCount>, H, A, floor);
   for (const x of specials) markets.push({ ...x, p: capLowP(x.p) });

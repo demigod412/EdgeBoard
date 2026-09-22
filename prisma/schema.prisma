@@ -1,0 +1,235 @@
+// EdgeBoard — basketball, baseball, ice hockey. Same ledger rules as PitchEdge:
+// predictions append-only (new revision, never edit a locked row); results append-only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Sport {
+  BASKETBALL
+  BASEBALL
+  HOCKEY
+}
+enum Source {
+  DEMO
+  API_SPORTS
+}
+enum GameStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+enum ConfidenceBand {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model League {
+  id         String   @id @default(cuid())
+  sport      Sport
+  source     Source
+  externalId String
+  name       String
+  country    String   @default("")
+  season     String
+  focus      Boolean  @default(false)
+  params     Json     @default("{}") // fitted: home, sigmaMargin, sigmaTotal, segShare, segSigmaRatio, dispersion, otHomeWin, extraRate, enTransfer, volatility
+  lastSyncAt DateTime?
+  teams      Team[]
+  games      Game[]
+  @@unique([source, sport, externalId, season])
+}
+
+model Team {
+  id         String  @id @default(cuid())
+  sport      Sport
+  source     Source
+  externalId String
+  name       String
+  shortName  String?
+  logoUrl    String?
+  leagueId   String
+  league     League  @relation(fields: [leagueId], references: [id])
+  home       Game[]  @relation("home")
+  away       Game[]  @relation("away")
+  ratings    TeamRating[]
+  @@unique([source, sport, externalId, leagueId])
+}
+
+model Game {
+  id          String     @id @default(cuid())
+  sport       Sport
+  source      Source
+  externalId  String
+  leagueId    String
+  league      League     @relation(fields: [leagueId], references: [id])
+  startUtc    DateTime
+  status      GameStatus @default(SCHEDULED)
+  homeTeamId  String
+  awayTeamId  String
+  homeTeam    Team       @relation("home", fields: [homeTeamId], references: [id])
+  awayTeam    Team       @relation("away", fields: [awayTeamId], references: [id])
+  homeScore   Int?       // final incl. OT / extra innings / shootout goal
+  awayScore   Int?
+  homeSeg     Int?       // 1st half / first 5 innings / 1st period
+  awaySeg     Int?
+  homeReg     Int?       // regulation (hockey 60', baseball 9 inn, basketball 48')
+  awayReg     Int?
+  extraTime   Boolean    @default(false)
+  homeFirst   Int?       // baseball: runs in the 1st inning (NRFI)
+  awayFirst   Int?
+  lines       MarketLine[]
+  predictions Prediction[]
+  results     Result[]
+  updatedAt   DateTime   @updatedAt
+  @@unique([source, sport, externalId])
+  @@index([sport, startUtc])
+}
+
+/// Bookmaker main lines (best effort). If absent, the model's own ladder is used.
+model MarketLine {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id])
+  market    String   // "moneyline" | "total" | "spread" | "seg_total"
+  line      Float    // total line, or HOME handicap (e.g. -5.5)
+  priceA    Float?   // over / home
+  priceB    Float?   // under / away
+  bookmaker String
+  fetchedAt DateTime @default(now())
+  @@index([gameId, market, fetchedAt])
+}
+
+model TeamRating {
+  id           String   @id @default(cuid())
+  teamId       String
+  team         Team     @relation(fields: [teamId], references: [id])
+  asOf         DateTime
+  modelVersion String
+  offense      Float    // basketball: points above league mean; count sports: attack multiplier α
+  defense      Float    // basketball: points conceded above mean; count sports: defence multiplier β
+  sampleWeight Float
+  games        Int
+  @@index([teamId, asOf])
+}
+
+model Prediction {
+  id           String   @id @default(cuid())
+  gameId       String
+  game         Game     @relation(fields: [gameId], references: [id])
+  sport        Sport
+  modelVersion String   @default("eb-rate-cal-v1")
+  revision     Int      @default(1)
+  generatedAt  DateTime @default(now())
+  lockedAt     DateTime?
+  inputsHash   String
+
+  muHome       Float    // expected points/runs/goals (full game)
+  muAway       Float
+  muSegHome    Float
+  muSegAway    Float
+
+  rawHomeWin   Float    // full game incl. OT/extras (no draw)
+  calHomeWin   Float
+
+  fairTotal    Float    // model median total
+  fairSpread   Float    // model median HOME handicap (negative = home favoured)
+  fairSegTotal Float
+
+  // Main lines used for the headline picks (book line if known, else reference line)
+  totalLine    Float
+  spreadLine   Float
+  segLine      Float
+  lineSource   String   // "book" | "reference"
+
+  rawOver      Float    // P(over totalLine)
+  calOver      Float
+  rawHomeCover Float    // P(home covers spreadLine)
+  calHomeCover Float
+  rawSegOver   Float
+  calSegOver   Float
+  pushTotal    Float    @default(0)
+  pushSpread   Float    @default(0)
+  pushSeg      Float    @default(0)
+
+  ladders      Json     // { total:[{line,over,push}], spread:[{line,home,push}], seg:[{line,over,push}] } calibrated
+  picks        Json     // strongest pick per market + best overall
+  confidence   Int
+  band         ConfidenceBand
+  dataFlags    String[]
+  rationale    Json
+  features     Json
+  @@unique([gameId, modelVersion, revision])
+  @@index([sport, generatedAt])
+}
+
+model Result {
+  id           String   @id @default(cuid())
+  gameId       String
+  game         Game     @relation(fields: [gameId], references: [id])
+  homeScore    Int
+  awayScore    Int
+  homeSeg      Int?
+  awaySeg      Int?
+  settledAt    DateTime @default(now())
+  hReg         Int?
+  aReg         Int?
+  extraTime    Boolean?
+  hFirst       Int?
+  aFirst       Int?
+  supersedesId String?
+  @@index([gameId, settledAt])
+}
+
+model CalibrationModel {
+  id           String   @id @default(cuid())
+  sport        Sport
+  modelVersion String
+  market       String   // "win" | "total" | "spread" | "seg_total"
+  method       String
+  n            Int
+  knots        Json
+  fittedAt     DateTime @default(now())
+  active       Boolean  @default(true)
+  @@index([sport, modelVersion, market, active])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  secret    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model SyncLog {
+  id         String   @id @default(cuid())
+  sport      Sport
+  job        String
+  ok         Boolean
+  message    String?
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+}
+
+/// Slip workshop: anonymous per-device slips (no accounts).
+model Slip {
+  id          String   @id @default(cuid())
+  ownerKey    String
+  name        String   @default("My slip")
+  legs        Json     // [{gameId, sport, market(key), label, match, start, p, band, addedAt, mk}]
+  bookingCode String?
+  bookingUrl  String?
+  bookingAt   DateTime?
+  bookingNote String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([ownerKey])
+}

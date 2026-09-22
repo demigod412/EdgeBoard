@@ -1,0 +1,17 @@
+# Changelog
+
+## 0.3.1
+- **Blend builder** (Scanners → Blend): pick any market on any game (mixed markets, one per game), see combined probability and fair odds, **Copy blend text**, or get a **Sportybet code** with **Copy code** and Open on Sportybet.
+- **Copy to clipboard** on slips: Copy code and Copy text, with a phone-friendly fallback and "Copied" confirmation.
+
+## 0.3.0 — parity with PitchEdge 0.5.x + specials
+- **Ledger:** calls lock at start − 15 min (latest call made before then), nothing re-predicted inside the window; results job every 15 min (provider called only when a game should have ended); results appended, corrections appended with `supersedesId`; calibration refit per sport.
+- **Accuracy page:** model vs home base rate and bookmaker moneyline (margin removed, before the lock); Brier chart; calibration buckets; confidence bands; every market type's hit rate.
+- **Specials (new markets):** team totals (strong lines), winning-margin bands (basketball), overtime / extra innings yes/no, regulation 3-way (hockey), first-segment 3-way (half-time / after 5 innings / 1st period), both teams score (baseball, hockey), NRFI / YRFI (baseball).
+- **Best pick per game** (board + game page): never "no overtime", an underdog + handicap, or both-teams-score ≥ 80%. **Best value card** per game.
+- **Top 20:** Most likely / Best value switch, market-group filter, All sports, caps (≤ 2 underdog handicaps, ≤ 3 team totals, ≤ 2 both-teams-score, never "no overtime"), locked-only track records with value ROI.
+- **Scanners:** Team totals, Specials, Upset watch (underdog moneyline with ≥ 5% edge).
+- **Odds:** moneyline prices stored alongside total / handicap / segment lines.
+- **Slips:** + on every market, multiple slips per device (mixed sports), drop weakest / drop Low / trim to 25%, split, merge, copy text, experimental Sportybet code.
+- **Mobile date bar:** 6-second fallback to a normal page load, neighbour-day preloading, invalid dates → today, empty days link to the next game day.
+- **Ops:** 3-hourly sync per sport runs as its own low-priority process (`npm run ingest -- <sport>`); `npm run selfcheck` (+ `-- --demo`).

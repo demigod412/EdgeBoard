@@ -10,7 +10,8 @@ export interface Mkt {
   line?: number | null; lo?: number; hi?: number;
   label: string; short: string; p: number;
   strong?: boolean;      // most aggressive line still at/above the strong floor
-  main?: boolean;        // at the main (bookmaker or reference) line
+  main?: boolean;        // at the main line (bookmaker line, or the model's estimate of it)
+  alt?: boolean;         // alternative line: listed under All markets / Blend / slips, not a Top 20 or headline candidate unless strong
 }
 export const GROUP_LABEL: Record<Group, string> = { win: "Win", total: "Total", spread: "Handicap", seg: "First segment", team: "Team totals", props: "Specials" };
 

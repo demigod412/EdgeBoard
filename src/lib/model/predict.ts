@@ -39,6 +39,8 @@ export interface PredictOutput {
 }
 
 const half = (x: number) => Math.floor(x) + 0.5;
+/** Nearest x.5 — how a bookmaker would post a line at the expected total. */
+const nearHalf = (x: number) => Math.round(x - 0.5) + 0.5;
 const fmtLine = (l: number) => (l > 0 ? `+${l}` : `${l}`);
 
 export function predictGame(inp: PredictInput): PredictOutput {
@@ -64,12 +66,18 @@ export function predictGame(inp: PredictInput): PredictOutput {
     if (inp.fit.sport === "hockey" && inp.fit.enTransfer === 0) flags.push("no_empty_net_adjustment");
   }
 
-  // Main lines: bookmaker if known, otherwise reference lines (league-average total; fair / ±1.5 handicap).
+  // Main lines: bookmaker if known, otherwise the model's estimate of the bookmaker line (its expected total, to the nearest .5).
   const haveBook = inp.book.total != null || inp.book.spread != null || inp.book.seg != null;
   if (!haveBook) flags.push("no_book_lines");
   const segShare = inp.fit.kind === "normal" ? inp.fit.segShare : inp.fit.segShare;
-  const totalLine = inp.book.total ?? half(leagueTotal);
-  const segLine = inp.book.seg ?? half(leagueTotal * segShare);
+  // The .5 line closest to a 50/50 split (the median, which is what bookmakers aim for; counts are skewed, so not the mean)
+  const evenLine = (fair: number, at: (l: number) => { a: number; push: number }, c0: Calibrator) => {
+    const c = [-3, -2, -1, 0, 1, 2, 3].map((k) => nearHalf(fair) + k).filter((l) => l > 0), q = (l: number) => Math.abs(apply(c0, at(l).a) - 0.5);
+    return c.reduce((best, l) => (q(l) < q(best) ? l : best), c[0]);
+  };
+  const totalLine = inp.book.total ?? evenLine(out.fairTotal, (l) => out.totalAt(l), cal.total);
+  const segLine = inp.book.seg ?? evenLine(out.fairSeg, (l) => out.segAt(l), cal.seg);
+  void segShare;
   const favHome = out.homeWin >= 0.5;
   const spreadLine = inp.book.spread ?? (cfg.fixedHandicaps ? (favHome ? -1.5 : 1.5) : half(out.fairSpread));
 
@@ -117,8 +125,15 @@ export function predictGame(inp: PredictInput): PredictOutput {
     const r = rows.filter((x) => 1 - x.a - x.push >= floor).sort((x, y) => x.line - y.line)[0];
     return r ? { market, side: "under", line: r.line, p: 1 - r.a - r.push, label: `${prefix}Under ${r.line}` } : null;
   };
-  const strongTotal = strongOU("total", ladders.total, out.fairTotal >= totalLine ? "over" : "under", "");
-  const strongSeg = strongOU("seg", ladders.seg, out.fairSeg >= segLine ? "over" : "under", `${U} `);
+  // Offered lines = main line + the sport's alternative offsets (both Over and Under), priced and calibrated.
+  const altRows = (main: number, offs: number[], at: (l: number) => { a: number; push: number }, c: Calibrator) => offs.map((o) => main + o).filter((l) => l > 0)
+    .map((line) => { const x = at(line); let a = apply(c, x.a); if (band === "LOW") a = clamp(a, 1 - LOW_BAND_DISPLAY_CAP, LOW_BAND_DISPLAY_CAP); return { line, a, push: x.push }; });
+  const totalRows = altRows(totalLine, cfg.altTotals, (l) => out.totalAt(l), cal.total), segRows = altRows(segLine, cfg.altSegs, (l) => out.segAt(l), cal.seg);
+  // Lean: towards the model's side of the bookmaker line; without one, towards the side of the league average this matchup sits on.
+  const leanT = (inp.book.total != null ? out.fairTotal >= inp.book.total : out.fairTotal >= leagueTotal) ? "over" : "under";
+  const leanS = (inp.book.seg != null ? out.fairSeg >= inp.book.seg : out.fairSeg >= leagueTotal * inp.fit.segShare) ? "over" : "under";
+  const strongTotal = strongOU("total", totalRows, leanT, "");
+  const strongSeg = strongOU("seg", segRows, leanS, `${U} `);
   // Handicap: the most points the favourite can give while still ≥ floor; else the smallest start the underdog needs.
   const fav = favHome ? "home" : "away";
   const cover = (r: LadderRow, side: "home" | "away") => (side === "home" ? r.a : 1 - r.a - r.push);
@@ -137,16 +152,19 @@ export function predictGame(inp: PredictInput): PredictOutput {
   const markets: Mkt[] = [
     mk({ group: "win", kind: "win", side: "home", label: `${H} to win`, short: `${H} win`, p: calWin, main: true }),
     mk({ group: "win", kind: "win", side: "away", label: `${A} to win`, short: `${A} win`, p: 1 - calWin, main: true }),
-    mk({ group: "total", kind: "total", side: "over", line: totalLine, label: `Over ${totalLine}`, short: `O${totalLine}`, p: calOver, main: true }),
-    mk({ group: "total", kind: "total", side: "under", line: totalLine, label: `Under ${totalLine}`, short: `U${totalLine}`, p: 1 - calOver - t.push, main: true }),
     mk({ group: "spread", kind: "spread", side: "home", line: spreadLine, label: `${H} ${fmtLine(spreadLine)}`, short: `${H} ${fmtLine(spreadLine)}`, p: calCover, main: true }),
     mk({ group: "spread", kind: "spread", side: "away", line: -spreadLine, label: `${A} ${fmtLine(-spreadLine)}`, short: `${A} ${fmtLine(-spreadLine)}`, p: 1 - calCover - s.push, main: true }),
-    mk({ group: "seg", kind: "seg", side: "over", line: segLine, label: `${segName} Over ${segLine}`, short: `${U} O${segLine}`, p: calSeg, main: true }),
-    mk({ group: "seg", kind: "seg", side: "under", line: segLine, label: `${segName} Under ${segLine}`, short: `${U} U${segLine}`, p: 1 - calSeg - g.push, main: true }),
   ];
+  const isStrong = (pk: Pick | null, side: string, line: number) => !!pk && pk.side === side && pk.line === line;
+  for (const [kind, rows, main, pre, sh, pk] of [["total", totalRows, totalLine, "", "", strongTotal], ["seg", segRows, segLine, `${segName} `, `${U} `, strongSeg]] as const)
+    for (const r of rows) for (const side of ["over", "under"] as const) {
+      const p = side === "over" ? (r.line === main ? (kind === "total" ? calOver : calSeg) : r.a) : 1 - (r.line === main ? (kind === "total" ? calOver : calSeg) : r.a) - r.push;
+      markets.push(mk({ group: kind, kind, side, line: r.line, label: `${pre}${side === "over" ? "Over" : "Under"} ${r.line}`, short: `${sh}${side === "over" ? "O" : "U"}${r.line}`, p,
+        ...(r.line === main ? { main: true } : { alt: true }), ...(isStrong(pk, side, r.line) ? { strong: true } : {}) }));
+    }
   const fromStrong = (pk: Pick | null) => pk && mk({ group: pk.market === "seg" ? "seg" : pk.market === "total" ? "total" : "spread", kind: pk.market === "seg" ? "seg" : pk.market === "total" ? "total" : "spread",
     side: pk.side, line: pk.line, label: pk.market === "seg" ? pk.label.replace(`${U} `, `${segName} `) : pk.label, short: pk.label, p: pk.p, strong: true });
-  for (const x of [fromStrong(strongTotal), fromStrong(strongSpread), fromStrong(strongSeg)]) if (x && !markets.some((m) => m.key === x.key)) markets.push(x);
+  for (const x of [fromStrong(strongSpread)]) if (x && !markets.some((m) => m.key === x.key)) markets.push(x);
   // Alternative run / puck lines (both sides of every line), priced from the same calibrated ladder
   if (cfg.altHandicaps) for (const r of ladders.spread) {
     if (!cfg.altHandicaps.includes(r.line)) continue;

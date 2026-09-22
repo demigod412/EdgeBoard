@@ -125,3 +125,25 @@ describe("alternative run / puck lines", () => {
     });
   }
 });
+
+describe("offered total lines", () => {
+  for (const sport of ["basketball", "baseball", "hockey"] as const) {
+    it(`${sport}: main line at the model's expected total, Over/Under on every offered line, strong line among them`, () => {
+      const h = hist(sport), fit = sport === "basketball" ? fitNormal(h, new Date(Date.UTC(2025, 8, 1))) : fitCount(sport, h, new Date(Date.UTC(2025, 8, 1)));
+      const o = predictGame({ sport, fit, homeId: "t1", awayId: "t2", homeName: "H", awayName: "A", start: new Date(), restHomeDays: 2, restAwayDays: 2, newsComplete: true, book: {}, formHome: "", formAway: "" });
+      const ms = o.picks.markets.filter((m) => m.kind === "total");
+      const main = ms.find((m) => m.main)!;
+      expect(Math.abs(main.p - 0.5)).toBeLessThan(sport === "basketball" ? 0.06 : 0.12); // main line ≈ 50/50, where a bookmaker posts it
+      const lines = [...new Set(ms.map((m) => m.line))];
+      for (const l of lines) { expect(ms.some((m) => m.line === l && m.side === "over")).toBe(true); expect(ms.some((m) => m.line === l && m.side === "under")).toBe(true); }
+      const spreadOfLines = Math.max(...lines.map((l) => l!)) - Math.min(...lines.map((l) => l!));
+      expect(spreadOfLines).toBeLessThanOrEqual(sport === "basketball" ? 24 : 4);
+      const st = ms.filter((m) => m.strong);
+      expect(st.length).toBeLessThanOrEqual(1);
+      if (st[0]) expect(lines).toContain(st[0].line);
+      // over probabilities fall as the line rises
+      const overs = ms.filter((m) => m.side === "over").sort((a, b) => a.line! - b.line!);
+      for (let i = 1; i < overs.length; i++) expect(overs[i].p).toBeLessThanOrEqual(overs[i - 1].p + 1e-9);
+    });
+  }
+});

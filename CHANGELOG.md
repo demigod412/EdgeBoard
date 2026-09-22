@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 — realistic total lines, Over and Under on every line
+- **Main total line** (game total and 1st half / F5 / 1st period): the bookmaker's line when odds are known; otherwise the line a bookmaker would post — the .5 line closest to a 50/50 split (the median, not the league average, which is what made lines look far off).
+- **Offered lines, Over and Under on each:** basketball main ±4 / ±8 / ±12 (1st half ±3 / ±6) · baseball main ±1 / ±2 (F5 ±1) · hockey main −1…+2 (1st period ±1). Shown under All markets, in Blend and slips.
+- **Strong lines** are now chosen only among those offered lines (no more lines 20+ points away), and team totals work the same way (basketball ±3 / ±6 points, baseball / hockey ±1).
+- Top 20 and the best pick use main and strong lines only; the other alternative lines are listed for your own choice.
+
 ## 0.5.0 — more leagues, more run lines
 - **Alternative run lines (baseball) −4.5 … +4.5 and puck lines (hockey) −3.5 … +3.5**, both sides, on every game (All markets, Blend, slips, Top 20 handicap filter), priced from the same calibrated ladder.
 - **WNBA** added to the free basketball source (balldontlie; skipped with a clear message if your balldontlie plan doesn't include it).

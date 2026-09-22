@@ -17,7 +17,7 @@ export const strengthOf = (p: number, confidence: number) => p * (0.85 + 0.15 * 
 
 export function tipsFor(p: Prediction, group?: Group): Tip[] {
   if (p.band === "LOW") return [];
-  return marketsOf(p).filter((m) => m.p >= MIN_P && (!group || m.group === group))
+  return marketsOf(p).filter((m) => m.p >= MIN_P && (!m.alt || m.strong) && (!group || m.group === group))
     .map((m) => ({ ...m, strength: strengthOf(m.p, p.confidence) })).sort((a, b) => b.strength - a.strength);
 }
 

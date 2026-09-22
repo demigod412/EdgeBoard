@@ -50,7 +50,7 @@ export function scan(slug: ScannerSlug, p: Prediction, f: Floors): Pick | null {
     case "strong-spread": return k.strongSpread;
     case "strong-seg": return k.strongSeg;
     case "team": case "specials": {
-      const ms = marketsOf(p).filter((m) => (slug === "team" ? m.kind === "team_total" : m.group === "props" && !headlineExcluded(m)));
+      const ms = marketsOf(p).filter((m) => (slug === "team" ? m.kind === "team_total" && m.strong : m.group === "props" && !headlineExcluded(m)));
       const b = ms.sort((x, y) => y.p - x.p)[0];
       return b ? ({ market: "win", side: b.side, line: b.line ?? null, p: b.p, label: b.label } as Pick) : null;
     }

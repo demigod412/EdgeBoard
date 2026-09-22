@@ -4,30 +4,34 @@
  *   first-segment 3-way (1st half / F5 / P1) · both teams score · no run in the 1st inning (NRFI, baseball)
  * They are not calibrated yet (raw model probabilities), which the UI says.
  */
-import { normCdf, halfLines } from "./common";
+import { normCdf } from "./common";
 import { pmf, type CountFit, type CountOut } from "./countModel";
 import type { NormalFit, NormalOut } from "./normalModel";
 import type { Mkt } from "../markets";
-import type { SportId } from "../sports";
+import { SPORTS, type SportId } from "../sports";
 
 const key = (m: Omit<Mkt, "key">) => `${m.kind}:${m.side}:${m.line ?? ""}${m.lo != null ? `:${m.lo}-${m.hi}` : ""}`;
 export const mk = (m: Omit<Mkt, "key">): Mkt => ({ ...m, key: key(m) });
 
-/** Most aggressive team-total line on the lean side with probability ≥ floor. */
-function strongTeamTotal(team: "home" | "away", name: string, lines: number[], over: (l: number) => number, lean: "over" | "under", floor: number, unit: string): Mkt | null {
-  const rows = lines.map((l) => ({ l, o: over(l) }));
-  const r = lean === "over" ? rows.filter((x) => x.o >= floor).sort((a, b) => b.l - a.l)[0] : rows.filter((x) => 1 - x.o >= floor).sort((a, b) => a.l - b.l)[0];
-  if (!r) return null;
-  const dir = lean === "over" ? "Over" : "Under";
-  return mk({ group: "team", kind: "team_total", side: `${team}:${lean}`, line: r.l, label: `${name} ${dir} ${r.l} ${unit}`, short: `${name} ${dir[0]}${r.l}`, p: lean === "over" ? r.o : 1 - r.o, strong: true });
+/**
+ * Team totals: lines at the team's expected score (nearest .5) plus the sport's offsets, Over and Under on each.
+ * The "strong" line is the most aggressive offered line on the lean side still at/above the floor.
+ */
+function teamTotals(team: "home" | "away", name: string, mu: number, over: (l: number) => number, lean: "over" | "under", floor: number, unit: string, offs: number[]): Mkt[] {
+  const main = Math.max(0.5, Math.round(mu - 0.5) + 0.5);
+  const rows = offs.map((o) => main + o).filter((l) => l > 0).map((l) => ({ l, o: over(l) }));
+  const strong = lean === "over" ? rows.filter((x) => x.o >= floor).sort((a, b) => b.l - a.l)[0] : rows.filter((x) => 1 - x.o >= floor).sort((a, b) => a.l - b.l)[0];
+  return rows.flatMap((r) => (["over", "under"] as const).map((dir) => mk({
+    group: "team", kind: "team_total", side: `${team}:${dir}`, line: r.l, label: `${name} ${dir === "over" ? "Over" : "Under"} ${r.l} ${unit}`, short: `${name} ${dir === "over" ? "O" : "U"}${r.l}`,
+    p: dir === "over" ? r.o : 1 - r.o, ...(r.l === main ? { main: true } : { alt: true }), ...(strong && strong.l === r.l && dir === lean ? { strong: true } : {}),
+  })));
 }
 
 export function propsNormal(fit: NormalFit, out: NormalOut, H: string, A: string, floor: number): Mkt[] {
   const res: Mkt[] = [];
   const sTeam = Math.sqrt(out.sigmaT ** 2 + out.sigmaM ** 2) / 2;
   for (const [team, mu, name] of [["home", out.muH, H], ["away", out.muA, A]] as const) {
-    const t = strongTeamTotal(team, name, halfLines(mu, 1, 10), (l) => 1 - normCdf((l - mu) / sTeam), mu >= fit.mu ? "over" : "under", floor, "pts");
-    if (t) res.push(t);
+    res.push(...teamTotals(team, name, mu, (l) => 1 - normCdf((l - mu) / sTeam), mu >= fit.mu ? "over" : "under", floor, "pts", SPORTS.basketball.teamAlt));
   }
   const mM = out.muH - out.muA, sM = out.sigmaM;
   const favHome = out.homeWin >= 0.5, d = favHome ? mM : -mM, fav = favHome ? "home" : "away", fn = favHome ? H : A;
@@ -55,8 +59,7 @@ export function propsCount(sport: SportId, fit: CountFit, out: CountOut, H: stri
   const overOf = (mp: Map<number, number>) => (l: number) => [...mp].reduce((s, [k, p]) => s + (k > l ? p : 0), 0);
   const leagueSide = fit.base * (1 + fit.home) / 2;
   for (const [team, mp, mu, name] of [["home", ph, out.muH, H], ["away", pa, out.muA, A]] as const) {
-    const t = strongTeamTotal(team, name, halfLines(mu, 1, sport === "baseball" ? 3 : 2).filter((l) => l > 0), overOf(mp), mu >= leagueSide ? "over" : "under", floor, unit);
-    if (t) res.push(t);
+    res.push(...teamTotals(team, name, mu, overOf(mp), mu >= leagueSide ? "over" : "under", floor, unit, SPORTS[sport].teamAlt));
   }
   const bttsLabel = sport === "baseball" ? "Both teams score a run" : "Both teams to score";
   res.push(mk({ group: "props", kind: "btts", side: "yes", label: bttsLabel, short: "BTTS yes", p: btts }));

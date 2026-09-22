@@ -99,3 +99,23 @@ describe("access code", () => {
     for (const p of ["/", "/basketball", "/basketball/top", "/slips"]) expect(isOpenPath(p)).toBe(false);
   });
 });
+
+describe("season picking", () => {
+  it("takes the latest season when the list is unordered and nothing is flagged current", async () => {
+    const { apiSports } = await import("@/lib/providers/apiSports");
+    const leagues = [{ id: 12, name: "NBA", type: "League", country: { name: "USA" },
+      seasons: [{ season: "2025-2026" }, { season: "2026-2027" }, { season: "2023-2024" }, { season: "2024-2025" }] }];
+    globalThis.fetch = (async () => new Response(JSON.stringify({ response: leagues, errors: [] }), { status: 200 })) as typeof fetch;
+    const [nba] = await apiSports("basketball", { key: "x" }).discoverLeagues!();
+    expect(nba.season).toBe("2026-2027");
+    expect(nba.prevSeason).toBe("2025-2026");
+  });
+  it("honours the current flag wherever it sits in the list", async () => {
+    const { apiSports } = await import("@/lib/providers/apiSports");
+    const leagues = [{ id: 9, name: "WNBA", type: "League", country: { name: "USA" },
+      seasons: [{ season: 2027 }, { season: 2026, current: true }, { season: 2025 }] }];
+    globalThis.fetch = (async () => new Response(JSON.stringify({ response: leagues, errors: [] }), { status: 200 })) as typeof fetch;
+    const [w] = await apiSports("basketball", { key: "x" }).discoverLeagues!();
+    expect(w.season).toBe("2026"); expect(w.prevSeason).toBe("2025");
+  });
+});

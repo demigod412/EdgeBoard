@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+- Fix: API-Sports lists a league's seasons in no particular order and often doesn't flag the current one, so EdgeBoard was syncing an old season (NBA 2025-26 as "current", and much older seasons elsewhere). Seasons are now sorted by year: the flagged season if there is one, otherwise the latest, with the one before it as history.
+- `sourcecheck` now says exactly why a sport has no source: switched off, set to API-Sports without a key, or missing balldontlie key.
+
 ## 0.7.1
 - `npm run sourcecheck` now lists every league your plan includes, the season it picked and how many games that season returns (current and previous) — so an empty league is easy to tell apart from a missing one.
 

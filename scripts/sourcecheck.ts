@@ -4,11 +4,18 @@
  */
 import { getProvider } from "../src/lib/providers";
 import { SPORT_IDS } from "../src/lib/sports";
+import { getSetting } from "../src/lib/secrets";
+import { DEFAULT_SOURCES } from "../src/lib/providers";
 
 (async () => {
   for (const s of SPORT_IDS) {
     const p = await getProvider(s);
-    if (!p) { console.log(`${s}: no source (switched off, or NBA without a balldontlie key)`); continue; }
+    if (!p) {
+      const enabled = await getSetting<Record<string, boolean>>("sportsEnabled", {});
+      const choice = { ...DEFAULT_SOURCES, ...(await getSetting<Record<string, string>>("sources", {})) }[s];
+      console.log(`${s}: no source — ${enabled[s] === false ? "switched off in Settings → Sports to sync" : choice === "api-sports" ? "set to API-Sports but no key saved" : s === "basketball" ? "free source needs a balldontlie key" : "no provider"}`);
+      continue;
+    }
     const t = await p.testConnection();
     console.log(`${s}: ${t.ok ? "OK  " : "FAIL"} ${t.message} · source ${p.name}`);
     if (!t.ok) continue;

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.7.1
+- `npm run sourcecheck` now lists every league your plan includes, the season it picked and how many games that season returns (current and previous) — so an empty league is easy to tell apart from a missing one.
+
 ## 0.7.0 — access code, many more leagues
 - **Access code:** a full-screen prompt covers the app until the code is entered. Set, change or remove it in **Settings → Access code** (PIN-protected), which always stays reachable. It locks again after 30 minutes of inactivity, every page view extends the window, and "Lock this device now" is available. The code is stored hashed (salted scrypt); changing it signs every device out. After 5 wrong codes the form locks for 5 minutes, tracked on the server.
 - **Many more leagues when a sport uses API-Sports** (matched by country + name, so they work on any plan that includes them):

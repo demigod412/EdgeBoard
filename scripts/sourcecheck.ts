@@ -10,8 +10,20 @@ import { SPORT_IDS } from "../src/lib/sports";
     const p = await getProvider(s);
     if (!p) { console.log(`${s}: no source (switched off, or NBA without a balldontlie key)`); continue; }
     const t = await p.testConnection();
-    console.log(`${s}: ${t.ok ? "OK  " : "FAIL"} ${t.message}`);
+    console.log(`${s}: ${t.ok ? "OK  " : "FAIL"} ${t.message} · source ${p.name}`);
     if (!t.ok) continue;
+    if (p.discoverLeagues) {
+      try {
+        const ls = await p.discoverLeagues();
+        console.log(`   ${ls.length} leagues on your plan:`);
+        for (const l of ls) {
+          const cur = await p.seasonGames(l.id, l.season ?? p.season(new Date())).catch((e) => e as Error);
+          const prev = l.prevSeason ? await p.seasonGames(l.id, l.prevSeason).catch((e) => e as Error) : [];
+          const count = (x: unknown) => (Array.isArray(x) ? `${x.length} games (${x.filter((g) => g.status === "FINISHED").length} final, ${x.filter((g) => g.status === "SCHEDULED").length} upcoming)` : `error: ${(x as Error).message}`);
+          console.log(`   · ${l.name} — season ${l.season}: ${count(cur)} | previous ${l.prevSeason ?? "-"}: ${count(prev)}`);
+        }
+      } catch (e) { console.log(`   league lookup failed: ${(e as Error).message}`); }
+    }
     try {
       const today = new Date().toISOString().slice(0, 10), yday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
       const [a, b] = [await p.gamesOn(yday), await p.gamesOn(today)];

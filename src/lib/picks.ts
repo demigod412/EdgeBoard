@@ -7,9 +7,12 @@ export interface Picks { win: Pick; total: Pick; spread: Pick; seg: Pick; strong
 export const picksOf = (p: Prediction) => p.picks as unknown as Picks;
 
 /** Flat market list for a prediction (older rows without one are rebuilt from their picks). */
+/** Markets retired from the app: "no overtime / no extra innings", and both-teams-score in baseball. */
+const retired = (p: Prediction, m: Mkt) => (m.kind === "ot" && m.side === "no") || (m.kind === "btts" && p.sport === "BASEBALL");
+
 export function marketsOf(p: Prediction): Mkt[] {
   const k = p.picks as unknown as Picks & { markets?: Mkt[] };
-  if (k.markets?.length) return k.markets;
+  if (k.markets?.length) return k.markets.filter((m) => !retired(p, m));
   const conv = (x: Pick | null, strong = false): Mkt | null => x && ({
     key: `${x.market}:${x.side}:${x.line ?? ""}`, group: x.market === "seg" ? "seg" : x.market, kind: x.market, side: x.side, line: x.line,
     label: x.label, short: x.label, p: x.p, strong, main: !strong,

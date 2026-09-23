@@ -119,3 +119,21 @@ describe("season picking", () => {
     expect(w.season).toBe("2026"); expect(w.prevSeason).toBe("2025");
   });
 });
+
+describe("retired markets", () => {
+  it("never surfaces 'no overtime' or baseball both-teams-score, even on old stored calls", async () => {
+    const { marketsOf } = await import("@/lib/picks");
+    const old = { sport: "BASEBALL", picks: { markets: [
+      { key: "ot:no:", kind: "ot", side: "no", group: "props", label: "Extra innings: no", short: "Extras no", p: 0.91 },
+      { key: "btts:yes:", kind: "btts", side: "yes", group: "props", label: "Both teams score a run", short: "BTTS yes", p: 0.86 },
+      { key: "win:home:", kind: "win", side: "home", group: "win", label: "Home", short: "Home", p: 0.58 },
+    ] } } as never;
+    const out = marketsOf(old);
+    expect(out.map((m) => m.kind)).toEqual(["win"]);
+    const hockey = { sport: "HOCKEY", picks: { markets: [
+      { key: "btts:yes:", kind: "btts", side: "yes", group: "props", label: "Both teams to score", short: "BTTS yes", p: 0.78 },
+      { key: "ot:yes:", kind: "ot", side: "yes", group: "props", label: "Overtime: yes", short: "OT yes", p: 0.23 },
+    ] } } as never;
+    expect(marketsOf(hockey).map((m) => m.kind).sort()).toEqual(["btts", "ot"]); // hockey keeps both
+  });
+});

@@ -41,7 +41,6 @@ export function propsNormal(fit: NormalFit, out: NormalOut, H: string, A: string
   }
   const ot = normCdf((0.5 - mM) / sM) - normCdf((-0.5 - mM) / sM);
   res.push(mk({ group: "props", kind: "ot", side: "yes", label: "Overtime: yes", short: "OT yes", p: ot }));
-  res.push(mk({ group: "props", kind: "ot", side: "no", label: "Overtime: no", short: "OT no", p: 1 - ot }));
   const sm = mM * fit.segShare, ss = sM * Math.max(0.55, fit.segSigmaRatio);
   const h1 = 1 - normCdf((0.5 - sm) / ss), a1 = normCdf((-0.5 - sm) / ss);
   res.push(mk({ group: "props", kind: "seg3", side: "home", label: `${H} lead at half-time`, short: `1H ${H}`, p: h1 }));
@@ -61,14 +60,16 @@ export function propsCount(sport: SportId, fit: CountFit, out: CountOut, H: stri
   for (const [team, mp, mu, name] of [["home", ph, out.muH, H], ["away", pa, out.muA, A]] as const) {
     res.push(...teamTotals(team, name, mu, overOf(mp), mu >= leagueSide ? "over" : "under", floor, unit, SPORTS[sport].teamAlt));
   }
-  const bttsLabel = sport === "baseball" ? "Both teams score a run" : "Both teams to score";
-  res.push(mk({ group: "props", kind: "btts", side: "yes", label: bttsLabel, short: "BTTS yes", p: btts }));
-  res.push(mk({ group: "props", kind: "btts", side: "no", label: `${bttsLabel}: No`, short: "BTTS no", p: 1 - btts }));
+  // Baseball: both teams scoring a run happens in ~85% of games — not a useful market, so it isn't offered.
+  if (sport !== "baseball") {
+    res.push(mk({ group: "props", kind: "btts", side: "yes", label: "Both teams to score", short: "BTTS yes", p: btts }));
+    res.push(mk({ group: "props", kind: "btts", side: "no", label: "Both teams to score: No", short: "BTTS no", p: 1 - btts }));
+  }
   const m = out.regMatrix;
   let rh = 0, rd = 0, ra = 0; m.forEach((row, i) => row.forEach((p, j) => { if (i > j) rh += p; else if (i === j) rd += p; else ra += p; }));
+  // Only the "yes" side: "no overtime / no extra innings" is near-certain and was never a tip worth showing.
   const otName = sport === "baseball" ? "Extra innings" : "Overtime / shootout";
   res.push(mk({ group: "props", kind: "ot", side: "yes", label: `${otName}: yes`, short: sport === "baseball" ? "Extras yes" : "OT yes", p: rd }));
-  res.push(mk({ group: "props", kind: "ot", side: "no", label: `${otName}: no`, short: sport === "baseball" ? "Extras no" : "OT no", p: 1 - rd }));
   if (sport === "hockey") {
     res.push(mk({ group: "props", kind: "reg3", side: "home", label: `${H} win in regulation (60 min)`, short: `60' ${H}`, p: rh }));
     res.push(mk({ group: "props", kind: "reg3", side: "draw", label: "Draw after 60 minutes", short: "60' draw", p: rd }));

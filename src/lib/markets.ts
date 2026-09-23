@@ -48,5 +48,5 @@ export const TOP_CAPS: { name: string; test: (m: Mkt) => boolean; max: number }[
   { name: "underdog handicap", test: (m) => m.kind === "spread" && (m.line ?? 0) > 0, max: 2 },
   { name: "team totals", test: (m) => m.kind === "team_total", max: 3 },
   { name: "both teams score", test: (m) => m.kind === "btts", max: 2 },
-  { name: "no OT / extra innings", test: (m) => m.kind === "ot" && m.side === "no", max: 0 },
+  { name: "no OT / extra innings", test: (m) => m.kind === "ot" && m.side === "no", max: 0 }, // retired, kept so old stored calls can never surface
 ];

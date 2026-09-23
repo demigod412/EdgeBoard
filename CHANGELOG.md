@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.1
+- Retired two markets: **"Overtime / extra innings: no"** (near-certain, never a useful tip) and **both teams to score in baseball** (it happens in about 85% of games). They no longer appear anywhere — predictions, All markets, Top 20, scanners, Blend, slips or the Odds builder — including on calls stored before this update. Hockey keeps both teams to score, and "Overtime: yes" stays for all sports.
+
 ## 0.8.0 — Odds builder
 - New **Builder** page per sport (with an **All sports** option): pick a target price (3, 5, 10, 30, 100 or your own) and a window, and get the combination that reaches it with the best chance, plus two alternatives.
 - Legs come from every market, alternative lines and specials included. One leg per game, at most 2 per competition and 2 of the same market type; the spread rules relax only if the target is otherwise unreachable.

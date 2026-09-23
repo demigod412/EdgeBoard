@@ -99,9 +99,10 @@ describe("specials from the model", () => {
       const ms = o.picks.markets;
       const sum = (k: string) => ms.filter((m) => m.kind === k).reduce((s, m) => s + m.p, 0);
       expect(sum("seg3")).toBeCloseTo(1, 2);
-      expect(sum("ot")).toBeCloseTo(1, 6);
+      expect(ms.filter((m) => m.kind === "ot")).toHaveLength(1); // only "overtime: yes" is offered
       if (sport === "hockey") expect(sum("reg3")).toBeCloseTo(1, 6);
-      if (sport !== "basketball") expect(sum("btts")).toBeCloseTo(1, 6);
+      if (sport === "hockey") expect(sum("btts")).toBeCloseTo(1, 6);
+      if (sport === "baseball") expect(ms.some((m) => m.kind === "btts")).toBe(false); // retired: ~85% of games
       if (sport === "baseball") { const n = ms.find((m) => m.kind === "nrfi" && m.side === "no_run")!; expect(n.p).toBeGreaterThan(0.3); expect(n.p).toBeLessThan(0.8); }
       if (sport === "basketball") expect(ms.filter((m) => m.kind === "margin")).toHaveLength(3);
       expect(ms.filter((m) => m.kind === "win")).toHaveLength(2);

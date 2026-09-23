@@ -6,6 +6,12 @@ Live: `https://arena.<your-domain>` · app folder `/var/www/<app>` (yours: **edg
 
 ---
 
+## Odds builder
+
+`/<sport>/builder` — choose a target price and a window (and optionally All sports); the app assembles the best combination, with two alternatives, a 14-day track record at that target, and Save as slip / Copy / Sportybet code. Legs: one per game, ≤ 2 per competition, ≤ 2 per market type. Without bookmaker odds the fair odds are used, so the target sets the chance (3.0 ≈ 1 in 3, 100 ≈ 1 in 100).
+
+---
+
 ## 1. Everyday commands
 
 Run these on the server. Replace `edgearena` if you named the app differently.

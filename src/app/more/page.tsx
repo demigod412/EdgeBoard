@@ -4,7 +4,7 @@ import { isSport } from "@/lib/sports";
 export const metadata = { title: "More" };
 export default async function More() {
   const c = (await cookies()).get("eb_sport")?.value ?? "", s = isSport(c) ? c : "basketball";
-  const links = [[`/${s}/accuracy`, "Accuracy", "Locked calls scored vs the home base rate and the bookmaker"], ["/slips", "Slips", "Your saved slips, optimise, split, merge, Sportybet code"],
+  const links = [[`/${s}/builder`, "Odds builder", "Build a 3, 5, 10, 30 or 100-odds combination for a day or a week"], [`/${s}/accuracy`, "Accuracy", "Locked calls scored vs the home base rate and the bookmaker"], ["/slips", "Slips", "Your saved slips, optimise, split, merge, Sportybet code"],
     ["/methodology", "Methodology", "Formulas for each sport, specials, value, ledger"], ["/settings", "Settings", "API key, sports to sync, floors"]];
   return (
     <ul className="space-y-2">

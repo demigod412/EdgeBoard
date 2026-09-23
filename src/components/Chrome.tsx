@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Radar, LineChart, Menu, BookOpen, Settings, Trophy, Ticket } from "lucide-react";
+import { CalendarDays, Radar, LineChart, Menu, BookOpen, Settings, Trophy, Ticket, Calculator } from "lucide-react";
 import { SPORTS, SPORT_IDS, isSport, type SportId } from "@/lib/sports";
 import { cn } from "./ui";
 
@@ -39,7 +39,7 @@ export function BottomTabs({ fallback }: { fallback: SportId }) {
     { href: `/${sport}`, label: "Board", icon: CalendarDays, on: rest === "" || rest.startsWith("/game") },
     { href: `/${sport}/top`, label: "Top 20", icon: Trophy, on: rest.startsWith("/top") },
     { href: `/${sport}/scanner`, label: "Scanners", icon: Radar, on: rest.startsWith("/scanner") },
-    { href: "/slips", label: "Slips", icon: Ticket, on: path.startsWith("/slips") },
+    { href: `/${sport}/builder`, label: "Builder", icon: Calculator, on: rest.startsWith("/builder") },
     { href: "/more", label: "More", icon: Menu, on: ["/more", "/methodology", "/settings"].some((x) => path.startsWith(x)) || rest.startsWith("/accuracy") },
   ];
   return (
@@ -73,6 +73,7 @@ export function LeftRail({ fallback }: { fallback: SportId }) {
         {item(`/${sport}`, "Board", CalendarDays, rest === "" || rest.startsWith("/game"))}
         {item(`/${sport}/top`, "Top 20 tips", Trophy, rest.startsWith("/top"))}
         {item(`/${sport}/scanner`, "Scanners", Radar, rest.startsWith("/scanner"))}
+        {item(`/${sport}/builder`, "Odds builder", Calculator, rest.startsWith("/builder"))}
         {item("/slips", "Slips", Ticket, path.startsWith("/slips"))}
         {item(`/${sport}/accuracy`, "Accuracy", LineChart, rest.startsWith("/accuracy"))}
         {item("/methodology", "Methodology", BookOpen, path.startsWith("/methodology"))}

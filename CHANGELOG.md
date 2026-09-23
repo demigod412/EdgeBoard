@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — Odds builder
+- New **Builder** page per sport (with an **All sports** option): pick a target price (3, 5, 10, 30, 100 or your own) and a window, and get the combination that reaches it with the best chance, plus two alternatives.
+- Legs come from every market, alternative lines and specials included. One leg per game, at most 2 per competition and 2 of the same market type; the spread rules relax only if the target is otherwise unreachable.
+- Bookmaker prices are used where stored (value legs preferred, **Best value / Safest** switch); otherwise the model's fair odds, with the chance stated plainly.
+- Each combination has **Save as slip**, **Copy** and **Sportybet code**, and shows its honest chance ("about 1 in 12") after a small correlation haircut.
+- **Track record**: the same target rebuilt from locked calls on each of the last 14 days.
+
 ## 0.7.3 — calmer screens, steadier syncs
 - **Dropdown filters** instead of long chip rows: league on the board (grouped by country — useful now that a paid plan brings 30+ leagues) and market on Top 20. Sport, time window and Most likely / Best value stay as buttons.
 - **Markets on a game page are collapsible**: Win and Total open by default; each closed section shows how many markets it holds and the best probability. Keeps a 40-market page short.

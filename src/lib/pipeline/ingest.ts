@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { SPORT_ENUM, type SportId } from "../sports";
+import { SPORT_ENUM, leagueLabel, type SportId } from "../sports";
 import type { PGame, SportProvider } from "../providers/types";
 import { rateAndPredictLeague } from "./predict";
 import { lockDue, refitCalibration, settle } from "./ledger";
@@ -16,11 +16,15 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
     let leagues = p.leagues;
     if (p.discoverLeagues) { try { const d = await p.discoverLeagues(); if (d.length) leagues = d; } catch (e) { report.discovery = `using default leagues: ${(e as Error).message}`; } }
     // Several countries run a league called "Super League", "NBL" or "Premier League". The report is
-    // keyed by name, so those used to overwrite each other and a failing league could hide behind a
-    // healthy namesake. Disambiguate with the provider id, but only where a name actually repeats.
-    const nameCount = new Map<string, number>();
-    for (const L of leagues) nameCount.set(L.name, (nameCount.get(L.name) ?? 0) + 1);
-    const label = (L: (typeof leagues)[number]) => (nameCount.get(L.name)! > 1 ? `${L.name} #${L.id}` : L.name);
+    // keyed by this label, so a bare name would let a failing league hide behind a healthy namesake.
+    // The country settles almost every clash ("Israel · Super League"); the provider id is the last
+    // resort for the rare case where even that repeats.
+    const labelCount = new Map<string, number>();
+    for (const L of leagues) { const k = leagueLabel(L); labelCount.set(k, (labelCount.get(k) ?? 0) + 1); }
+    const label = (L: (typeof leagues)[number]) => {
+      const k = leagueLabel(L);
+      return labelCount.get(k)! > 1 ? `${k} #${L.id}` : k;
+    };
     for (const L of leagues) {
       const season = L.season ?? p.season(now);
       let games: PGame[] = [];

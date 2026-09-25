@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.5 — readable sync report
+- The sync report keys leagues by **"Israel · Super League"** rather than "Super League #51". Provider
+  ids disambiguated the clashes in 0.9.2 because leagues did not carry a country yet; they do now, and
+  the country settles almost every case. The id remains as a last resort.
+
 ## 0.9.4 — WNBA confirmed, G League picked up
 - **WNBA is synced and now reads "USA · WNBA".** A live plan confirms API-Sports files it as
   **"NBA W"** (id 13, 345 games in season 2026). The stored name stays the provider's, but the UI

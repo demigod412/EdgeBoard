@@ -15,14 +15,20 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
   try {
     let leagues = p.leagues;
     if (p.discoverLeagues) { try { const d = await p.discoverLeagues(); if (d.length) leagues = d; } catch (e) { report.discovery = `using default leagues: ${(e as Error).message}`; } }
+    // Several countries run a league called "Super League", "NBL" or "Premier League". The report is
+    // keyed by name, so those used to overwrite each other and a failing league could hide behind a
+    // healthy namesake. Disambiguate with the provider id, but only where a name actually repeats.
+    const nameCount = new Map<string, number>();
+    for (const L of leagues) nameCount.set(L.name, (nameCount.get(L.name) ?? 0) + 1);
+    const label = (L: (typeof leagues)[number]) => (nameCount.get(L.name)! > 1 ? `${L.name} #${L.id}` : L.name);
     for (const L of leagues) {
       const season = L.season ?? p.season(now);
       let games: PGame[] = [];
-      try { games = await p.seasonGames(L.id, season); } catch (e) { report[L.name] = `skip: ${(e as Error).message}`; continue; }
+      try { games = await p.seasonGames(L.id, season); } catch (e) { report[label(L)] = `skip: ${(e as Error).message}`; continue; }
       if (games.filter((g) => g.status === "FINISHED").length < 150) {
-        try { games = [...(await p.seasonGames(L.id, L.prevSeason ?? p.prevSeason(season))), ...games]; } catch (e) { report[`${L.name} previous season`] = `not loaded: ${(e as Error).message}`; }
+        try { games = [...(await p.seasonGames(L.id, L.prevSeason ?? p.prevSeason(season))), ...games]; } catch (e) { report[`${label(L)} previous season`] = `not loaded: ${(e as Error).message}`; }
       }
-      if (!games.length) { report[L.name] = "no games"; continue; }
+      if (!games.length) { report[label(L)] = "no games"; continue; }
       const league = await db.league.upsert({
         where: { source_sport_externalId_season: { source: SRC, sport: S, externalId: L.id, season } },
         update: { name: L.name, focus: !!L.focus }, create: { source: SRC, sport: S, externalId: L.id, season, name: L.name, focus: !!L.focus },
@@ -68,7 +74,7 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
       }
       await db.league.update({ where: { id: league.id }, data: { lastSyncAt: new Date() } });
       // API-Sports has no confirmed lineups / probable pitchers / starting goalies → news stays incomplete (max Medium).
-      report[L.name] = { source: p.name, ...(await rateAndPredictLeague(db, sport, league.id, { now, newsComplete: (g) => g.newsReady })), lines, ...(segFilled ? { segFilled } : {}) };
+      report[label(L)] = { source: p.name, ...(await rateAndPredictLeague(db, sport, league.id, { now, newsComplete: (g) => g.newsReady })), lines, ...(segFilled ? { segFilled } : {}) };
     }
     report.locked = await lockDue(db, now);
     report.settled = await settle(db, sport);

@@ -19,10 +19,12 @@ import { DEFAULT_SOURCES } from "../src/lib/providers";
     const t = await p.testConnection();
     console.log(`${s}: ${t.ok ? "OK  " : "FAIL"} ${t.message} · source ${p.name}`);
     if (!t.ok) continue;
-    if (p.discoverLeagues) {
+    // API-Sports discovers leagues from your plan; the free sources carry a fixed list
+    // (NBA + WNBA), which still needs reporting so a missing WNBA plan is visible here.
+    {
       try {
-        const ls = await p.discoverLeagues();
-        console.log(`   ${ls.length} leagues on your plan:`);
+        const ls = p.discoverLeagues ? await p.discoverLeagues() : p.leagues;
+        console.log(`   ${ls.length} leagues ${p.discoverLeagues ? "on your plan" : "on this source"}:`);
         for (const l of ls) {
           const cur = await p.seasonGames(l.id, l.season ?? p.season(new Date())).catch((e) => e as Error);
           const prev = l.prevSeason ? await p.seasonGames(l.id, l.prevSeason).catch((e) => e as Error) : [];

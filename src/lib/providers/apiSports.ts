@@ -79,11 +79,22 @@ export function parseOdds(sport: SportId, resp: AnyObj[]): PLines {
   return out;
 }
 
-/** Top leagues wanted per sport: [country, league-name pattern, focus]. Only those on your plan are used. */
-export const WANTED: Record<SportId, [string, RegExp, boolean?][]> = {
+/**
+ * Top leagues wanted per sport: [country, league-name pattern, focus?, all?].
+ * Only those on your plan are used; anything missing is skipped silently, so run
+ * `npm run sourcecheck` after changing this to see what actually matched.
+ *   focus → listed first in the league filter
+ *   all   → take EVERY league matching the pattern, not just the first. Needed where one
+ *           name covers several competitions (NCAA divisions, junior leagues).
+ */
+export const WANTED: Record<SportId, [string, RegExp, boolean?, boolean?][]> = {
   basketball: [
-    ["USA", /^NBA$/i, true], ["USA", /^WNBA$/i, true], ["USA", /^NCAA(\b|$)/i],
-    ["Europe", /^Euroleague$/i, true], ["Europe", /^Eurocup$/i], ["Europe", /^Champions League$/i], ["Europe", /^ABA League$|^Adriatic League$/i],
+    ["USA", /^NBA$/i, true], ["USA", /^WNBA$/i, true], ["USA", /^NCAA(\b|$)/i, true, true],
+    ["USA", /^NBA G League$|^G League$/i],
+    // Europe-wide competitions
+    ["Europe", /^Euroleague$/i, true], ["Europe", /^Eurocup$/i], ["Europe", /^Champions League$/i],
+    ["Europe", /^FIBA Europe Cup$/i], ["Europe", /^ABA League$|^Adriatic League$/i],
+    // Europe: top flights
     ["Spain", /^ACB$|^Liga Endesa$/i], ["Turkey", /^Super Lig|^BSL$/i], ["Italy", /^Lega A$|^Serie A$/i], ["Greece", /^Basket League$|^A1$/i],
     ["France", /^LNB$|^Pro A$|^Betclic Elite$/i], ["Germany", /^BBL$/i], ["Lithuania", /^LKL$/i], ["Israel", /^Super League$|^Winner League$/i],
     ["Russia", /^VTB United League$|^Super League$/i], ["Poland", /^(PLK|Energa Basket Liga|Superliga)$/i], ["Serbia", /^Super League$|^KLS$/i],
@@ -91,24 +102,58 @@ export const WANTED: Record<SportId, [string, RegExp, boolean?][]> = {
     ["Portugal", /^LPB$|^Proliga$/i], ["Netherlands", /^DBL$|^BNXT League$/i], ["Finland", /^Korisliiga$/i], ["Sweden", /^Basketligan$/i], ["Denmark", /^Basketligaen$/i],
     ["Switzerland", /^SB League$/i], ["Austria", /^Superliga$|^Basketball Bundesliga$/i], ["Hungary", /^NB I\.? A$/i], ["Romania", /^Divizia A$|^Liga Nationala$/i],
     ["Bulgaria", /^NBL$/i], ["Ukraine", /^Superleague$/i], ["Latvia", /^LBL$/i], ["Estonia", /^KML$/i],
-    ["Japan", /^B\.?League$/i], ["South-Korea", /^KBL$/i], ["Philippines", /^PBA$/i], ["China", /^CBA$/i], ["Australia", /^NBL$/i], ["New-Zealand", /^NBL$/i],
-    ["Argentina", /^Liga A$|^Liga Nacional$/i], ["Brazil", /^NBB$/i], ["Mexico", /^LNBP$/i], ["Uruguay", /^Liga Uruguaya$|^LUB$/i], ["Chile", /^LNB$/i], ["Venezuela", /^Superliga$/i],
-    ["Canada", /^CEBL$/i], ["Taiwan", /^(P\.? ?LEAGUE\+?|T1 League)$/i],
+    ["Bosnia-and-Herzegovina", /^Prvenstvo BiH$|^Championship$/i], ["Montenegro", /^Prva A Liga$|^First League$/i],
+    ["North-Macedonia", /^Superleague$|^First League$/i], ["Kosovo", /^Superliga$/i], ["Slovakia", /^Extraliga$/i],
+    ["Georgia", /^Superleague$/i], ["Cyprus", /^Division A$|^OPAP Basket League$/i], ["Belarus", /^Premier League$/i],
+    ["Norway", /^BLNO$|^Elite Serien$/i], ["Iceland", /^Dominos League$|^Urvalsdeild$/i],
+    // Europe: second tiers
+    ["Spain", /^LEB Oro$/i], ["Germany", /^ProA$/i], ["Italy", /^Serie A2$/i], ["France", /^Pro B$/i],
+    ["Greece", /^A2$/i], ["Turkey", /^TBL$|^TB2L$/i],
+    // Asia & Oceania
+    ["Japan", /^B\.?League$/i], ["Japan", /^B2\.?League$|^B\.?League 2$/i], ["South-Korea", /^KBL$/i], ["Philippines", /^PBA$/i],
+    ["China", /^CBA$/i], ["Australia", /^NBL$/i], ["New-Zealand", /^NBL$/i],
+    ["Indonesia", /^IBL$/i], ["Vietnam", /^VBA$/i], ["Thailand", /^TBL$|^Thailand League$/i], ["India", /^UBA$|^Basketball League$/i],
+    ["Iran", /^Super League$/i], ["Lebanon", /^Division A$/i], ["Qatar", /^Basketball League$/i],
+    ["Saudi-Arabia", /^Premier League$/i], ["United-Arab-Emirates", /^Division 1$/i],
+    ["Kazakhstan", /^National League$/i], ["Uzbekistan", /^Super League$/i],
+    // Americas
+    ["Argentina", /^Liga A$|^Liga Nacional$/i], ["Brazil", /^NBB$/i], ["Mexico", /^LNBP$/i], ["Uruguay", /^Liga Uruguaya$|^LUB$/i],
+    ["Chile", /^LNB$/i], ["Venezuela", /^Superliga$/i], ["Canada", /^CEBL$/i], ["Taiwan", /^(P\.? ?LEAGUE\+?|T1 League)$/i],
+    ["Puerto-Rico", /^BSN$/i], ["Dominican-Republic", /^LNB$/i], ["Colombia", /^Liga Profesional$|^DirecTV Liga$/i],
+    ["Peru", /^Liga Peruana$/i], ["Paraguay", /^Liga Paraguaya$|^Division I$/i], ["Bolivia", /^Libobasquet$/i], ["Ecuador", /^Liga Ecuatoriana$/i],
+    // Africa
+    ["Africa", /^BAL$|^Basketball Africa League$/i], ["Egypt", /^Premier League$|^Superleague$/i], ["Tunisia", /^Championnat$|^Division I$/i],
+    ["Morocco", /^Division Excellence$/i], ["Nigeria", /^Premier League$/i], ["Angola", /^Unitel Basket$|^BAI Basket$/i], ["Senegal", /^Division I$/i],
   ],
   baseball: [
-    ["USA", /^MLB$/i, true], ["Japan", /^NPB$/i, true], ["South-Korea", /^KBO$/i, true], ["Taiwan", /^CPBL$/i], ["Mexico", /^LMB$/i], ["Mexico", /^LMP$/i],
+    ["USA", /^MLB$/i, true], ["USA", /^NCAA(\b|$)/i, false, true], ["USA", /^MiLB$|^Minor League/i],
+    ["Japan", /^NPB$/i, true], ["South-Korea", /^KBO$/i, true], ["Taiwan", /^CPBL$/i], ["Mexico", /^LMB$/i], ["Mexico", /^LMP$/i],
     ["Dominican-Republic", /^LIDOM$/i], ["Venezuela", /^LVBP$/i], ["Puerto-Rico", /^LBPRC$|^Liga de B(é|e)isbol/i], ["Colombia", /^LCBP$|^Liga Colombiana/i],
     ["Panama", /^Probeis$/i], ["Nicaragua", /^LBPN$/i], ["Cuba", /^Serie Nacional$/i], ["Australia", /^ABL$/i], ["Netherlands", /^Hoofdklasse$/i], ["Italy", /^Serie A$/i],
-    ["China", /^CBL$/i], ["USA", /^MiLB$|^Minor League/i],
+    ["China", /^CBL$/i],
+    // Farm systems and more national leagues
+    ["Japan", /^(Eastern|Western) League$/i], ["South-Korea", /^Futures League$/i],
+    ["Germany", /^Bundesliga$/i], ["Czech-Republic", /^Extraliga$/i], ["Spain", /^Division de Honor$/i],
+    ["France", /^Division 1$/i], ["Austria", /^Bundesliga$/i], ["Croatia", /^1\. Liga$/i], ["Belgium", /^Division 1$/i],
+    ["Brazil", /^Campeonato Brasileiro$/i], ["Curacao", /^Baseball League$/i],
   ],
   hockey: [
-    ["USA", /^NHL$/i, true], ["Russia", /^KHL$/i, true], ["Sweden", /^SHL$/i, true], ["Finland", /^Liiga$/i, true], ["Germany", /^DEL$/i],
-    ["Czech-Republic", /^Extraliga$|^Chance Liga$/i], ["Switzerland", /^National League$/i], ["USA", /^AHL$/i], ["USA", /^ECHL$/i],
+    ["USA", /^NHL$/i, true], ["USA", /^NCAA(\b|$)/i, false, true], ["USA", /^AHL$/i], ["USA", /^ECHL$/i], ["USA", /^USHL$/i],
+    ["Canada", /^(OHL|WHL|QMJHL)$/i, false, true],
+    ["Russia", /^KHL$/i, true], ["Sweden", /^SHL$/i, true], ["Finland", /^Liiga$/i, true], ["Germany", /^DEL$/i],
+    ["Czech-Republic", /^Extraliga$|^Chance Liga$/i], ["Switzerland", /^National League$/i],
     ["Austria", /^(ICE Hockey League|EBEL|Bundesliga)$/i], ["Slovakia", /^Extraliga$/i], ["Norway", /^Eliteserien$|^Fjordkraft-ligaen$/i], ["Denmark", /^Metal Ligaen$|^Superisligaen$/i],
     ["Poland", /^Polska Hokej Liga$|^PHL$/i], ["Latvia", /^Optibet Hokeja Liga$|^OHL$/i], ["Belarus", /^Extraleague$/i], ["Kazakhstan", /^Championship$|^Pro Hokei Ligasy$/i],
     ["France", /^Ligue Magnus$/i], ["Italy", /^(Alps Hockey League|IHL|Serie A)$/i], ["United-Kingdom", /^EIHL$|^Elite League$/i], ["Sweden", /^HockeyAllsvenskan$/i],
     ["Finland", /^Mestis$/i], ["Switzerland", /^Swiss League$/i], ["Germany", /^DEL2$/i], ["Hungary", /^Erste Liga$/i], ["Romania", /^Liga Nationala$/i],
     ["Japan", /^Asia League$/i], ["China", /^Asia League$/i],
+    // Second tiers and more national leagues
+    ["Sweden", /^HockeyEttan$/i], ["Finland", /^Suomi-sarja$/i], ["Czech-Republic", /^1\. Liga$/i],
+    ["Denmark", /^1\. Division$/i], ["Norway", /^1\. Divisjon$/i], ["France", /^Division 1$/i],
+    ["Slovenia", /^Slovenian League$|^Alps Hockey League$/i], ["Croatia", /^Croatian League$/i], ["Serbia", /^Serbian League$/i],
+    ["Ukraine", /^Ukrainian Hockey League$|^UHL$/i], ["Estonia", /^Meistriliiga$/i], ["Lithuania", /^Hockey League$/i],
+    ["Netherlands", /^BeNe League$/i], ["Belgium", /^BeNe League$/i], ["Spain", /^Liga Nacional$/i],
+    ["South-Korea", /^Asia League$/i],
   ],
 };
 
@@ -131,15 +176,19 @@ export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: strin
       type L = { id: number; name: string; type?: string; country?: { name?: string }; seasons?: { season: string | number; current?: boolean }[] };
       const all = (await get(`/leagues`)) as unknown as L[];
       const out: LeagueRef[] = [];
-      for (const [country, re, focus] of WANTED[sport]) {
-        const l = all.find((x) => (x.country?.name ?? "").toLowerCase() === country.toLowerCase() && re.test(x.name.trim()) && (x.type ?? "League") !== "Cup");
-        if (!l?.seasons?.length) continue;
-        // API-Sports returns seasons in no particular order and doesn't always flag the current one:
-        // sort by start year and take the flagged season, else the latest.
-        const seasons = l.seasons.map((x) => ({ s: String(x.season), year: Number(String(x.season).slice(0, 4)) || 0, cur: !!x.current }))
-          .sort((a, b) => a.year - b.year);
-        const i = seasons.findIndex((x) => x.cur) >= 0 ? seasons.findIndex((x) => x.cur) : seasons.length - 1;
-        out.push({ id: String(l.id), name: l.name, focus: !!focus, season: seasons[i].s, prevSeason: seasons[i - 1]?.s });
+      for (const [country, re, focus, wantAll] of WANTED[sport]) {
+        const hits = all.filter((x) => (x.country?.name ?? "").toLowerCase() === country.toLowerCase() && re.test(x.name.trim()) && (x.type ?? "League") !== "Cup");
+        // One league per row by default. An `all` row takes every match, because a single name can
+        // cover several competitions (NCAA has divisions; Canada's juniors are three leagues).
+        for (const l of wantAll ? hits : hits.slice(0, 1)) {
+          if (!l?.seasons?.length || out.some((o) => o.id === String(l.id))) continue;
+          // API-Sports returns seasons in no particular order and doesn't always flag the current one:
+          // sort by start year and take the flagged season, else the latest.
+          const seasons = l.seasons.map((x) => ({ s: String(x.season), year: Number(String(x.season).slice(0, 4)) || 0, cur: !!x.current }))
+            .sort((a, b) => a.year - b.year);
+          const i = seasons.findIndex((x) => x.cur) >= 0 ? seasons.findIndex((x) => x.cur) : seasons.length - 1;
+          out.push({ id: String(l.id), name: l.name, focus: !!focus, season: seasons[i].s, prevSeason: seasons[i - 1]?.s });
+        }
       }
       return out;
     },

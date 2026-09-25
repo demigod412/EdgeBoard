@@ -77,9 +77,11 @@ Useful `.env` lines:
 After editing `.env`, always `sudo systemctl restart edgearena`.
 
 **Data source per sport** (Settings → Data source):
-- **Free** — baseball: MLB Stats API, hockey: NHL API (no keys); basketball: balldontlie (free key). No bookmaker odds.
-- **API-Sports** — needs a paid plan for that sport's current season; adds odds and every league on your plan.
-Switching a sport takes effect on its next sync.
+- **Free** — baseball: MLB Stats API, hockey: NHL API (no keys); basketball: balldontlie, NBA **and WNBA** (free key; WNBA needs a plan that includes it). No bookmaker odds, and NBA/WNBA/MLB/NHL only.
+- **API-Sports** — needs a paid plan for that sport's current season; adds odds and every league on your plan, which is where NCAA and the other ~170 competitions in `WANTED` come from.
+Switching a sport takes effect on its next sync. Every sport defaults to the free source, so a sport
+stays on NBA/WNBA, MLB or the NHL until you switch it here. `npm run sourcecheck` lists what each
+source actually returns, league by league, with game counts.
 
 ---
 

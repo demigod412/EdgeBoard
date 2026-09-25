@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.9.0 — safest capped at 1.60 a leg, many more leagues, NCAA divisions fixed
+- **Builder → Safest never uses a leg priced above 1.60.** A long target is reached with more,
+  shorter picks rather than a few risky ones. The cap is absolute: when a target cannot be reached
+  under it, the page says so and points at a longer window, all sports, a lower target, more legs or
+  Best value, rather than quietly slipping a 3.00 leg into a slip labelled "safest". The 14-day track
+  record on that tab is rebuilt under the same cap. Best value is unchanged.
+- **Many more leagues on API-Sports** — the wanted list goes from 96 to 170 competitions:
+  · basketball (93) — NCAA (every division, see below), NBA G League, FIBA Europe Cup, second tiers in
+    Spain (LEB Oro), Germany (ProA), Italy (Serie A2), France (Pro B), Greece (A2) and Turkey (TBL),
+    plus Bosnia, Montenegro, North Macedonia, Kosovo, Slovakia, Georgia, Cyprus, Belarus, Norway,
+    Iceland, Japan B2, Indonesia, Vietnam, Thailand, India, Iran, Lebanon, Qatar, Saudi Arabia, UAE,
+    Kazakhstan, Uzbekistan, Puerto Rico, Dominican Republic, Colombia, Peru, Paraguay, Bolivia,
+    Ecuador, and Africa — the Basketball Africa League, Egypt, Tunisia, Morocco, Nigeria, Angola, Senegal
+  · baseball (30) — NCAA, Japan's Eastern and Western farm leagues, Korea's Futures League, and the
+    European leagues: Germany, Czechia, Spain, France, Austria, Croatia, Belgium, plus Brazil and Curacao
+  · hockey (47) — NCAA, USHL, Canada's three junior leagues (OHL, WHL, QMJHL), second tiers in Sweden
+    (HockeyEttan), Finland (Suomi-sarja), Czechia (1. Liga), Denmark, Norway and France, plus Slovenia,
+    Croatia, Serbia, Ukraine, Estonia, Lithuania, the BeNe League, Spain and South Korea
+- **Fix: NCAA only ever synced one division.** League discovery matched each entry with `find`, taking
+  the first competition whose name fitted and ignoring the rest — so "NCAA", which covers several
+  divisions, contributed exactly one, whichever the provider happened to return first. Entries can now
+  opt into taking every match, and NCAA (all three sports) and Canada's juniors do. Every other entry
+  behaves exactly as before, and duplicates are dropped.
+- **`npm run sourcecheck` now lists the free sources' leagues too**, with the season and game counts it
+  already showed for API-Sports. It only did this for API-Sports before, which meant there was no way to
+  see whether **WNBA** was actually included in your balldontlie plan. WNBA itself needs no change — it
+  has been wired into the free basketball source (its own endpoint and season) and the API-Sports list
+  all along; if it is missing it is the plan, and this is now how you confirm that.
+- Note: all of the extra leagues live on API-Sports. The free sources carry NBA and WNBA, MLB, and the
+  NHL only, and every sport defaults to the free source — switch a sport under **Settings → Data source**
+  and give it a plan that includes the competitions you want.
+
 ## 0.8.1
 - Retired two markets: **"Overtime / extra innings: no"** (near-certain, never a useful tip) and **both teams to score in baseball** (it happens in about 85% of games). They no longer appear anywhere — predictions, All markets, Top 20, scanners, Blend, slips or the Odds builder — including on calls stored before this update. Hockey keeps both teams to score, and "Overtime: yes" stays for all sports.
 

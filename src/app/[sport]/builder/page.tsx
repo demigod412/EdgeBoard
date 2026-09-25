@@ -5,7 +5,7 @@ import { dataMode } from "@/lib/mode";
 import { gameInclude } from "@/lib/queries";
 import { marketsOf } from "@/lib/picks";
 import { GROUP_LABEL, hitOf, type Group } from "@/lib/markets";
-import { buildSlips, legHint, oneInN, type Candidate } from "@/lib/builder";
+import { buildSlips, legHint, oneInN, SAFE_MAX_LEG_ODDS, type Candidate } from "@/lib/builder";
 import { latestLines, oddsFor } from "@/lib/value";
 import { SPORTS, SPORT_ENUM, SPORT_IDS, type SportId } from "@/lib/sports";
 import { dayKey, fmtWat } from "@/lib/time";
@@ -58,7 +58,10 @@ export default async function Builder({ params, searchParams }: {
     });
   });
   const withOdds = candidates.some((c) => c.real);
-  const slips = buildSlips(candidates, { target, maxLegs, mode: withOdds ? mode : "safe", band: "LOW" }, 3);
+  // Only when Safest was actually chosen: with no stored odds the toggle is hidden and the search
+  // already runs in safe mode, so capping there would silently change that view.
+  const legCap = mode === "safe" ? SAFE_MAX_LEG_ODDS : undefined;
+  const slips = buildSlips(candidates, { target, maxLegs, mode: withOdds ? mode : "safe", band: "LOW", maxLegOdds: legCap }, 3);
   const hint = legHint(target);
   const sportOf = (e: string) => SPORT_IDS.find((s) => SPORT_ENUM[s] === e)!;
 
@@ -74,7 +77,7 @@ export default async function Builder({ params, searchParams }: {
     const cands: Candidate[] = ps.flatMap((x) => marketsOf(x).map((m) => ({
       matchId: x.gameId, league: x.game.league.name, startMs: +x.game.startUtc, match: `${x.game.awayTeam.name} at ${x.game.homeTeam.name}`,
       label: m.label, market: m.key, group: m.group, p: m.p, odds: 1 / m.p, real: false, band: x.band })));
-    const [built] = buildSlips(cands, { target, maxLegs, mode: "safe", band: "LOW" }, 1);
+    const [built] = buildSlips(cands, { target, maxLegs, mode: "safe", band: "LOW", maxLegOdds: legCap }, 1);
     if (!built) return [];
     const legs = built.legs.map((l) => {
       const x = ps.find((q) => q.gameId === l.matchId)!, r = x.game.results[0];
@@ -94,6 +97,7 @@ export default async function Builder({ params, searchParams }: {
           Pick a target price and a window; the builder assembles the combination that reaches it with the best chance —
           one leg per game, at most 2 per competition and 2 of the same market type.
           {withOdds ? " Bookmaker prices are used where they exist, so value legs are preferred." : " No bookmaker prices are stored for these games, so the model's fair odds are used: the target itself sets the chance."}
+          {legCap ? ` Safest never uses a leg priced above ${legCap.toFixed(2)}, so the target is reached with more, shorter picks.` : ""}
         </p>
       </header>
 
@@ -127,7 +131,9 @@ export default async function Builder({ params, searchParams }: {
 
       {slips.length === 0 ? (
         <EmptyState title="No combination reaches that target"
-          body={`Nothing in this window adds up to ${target.toFixed(2)} within the leg limit. Try a longer window, all sports, a lower target or more legs.`}
+          body={legCap
+            ? `Safest only uses legs priced ${legCap.toFixed(2)} or shorter, and nothing in this window reaches ${target.toFixed(2)} that way within ${maxLegs} legs. Try a longer window, all sports, a lower target, more legs, or switch to Best value.`
+            : `Nothing in this window adds up to ${target.toFixed(2)} within the leg limit. Try a longer window, all sports, a lower target or more legs.`}
           action={{ href: href({ days: Math.min(14, days * 2), scope: "all" }), label: "Widen the search" }} />
       ) : (
         <div className="space-y-4">

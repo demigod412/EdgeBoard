@@ -10,7 +10,7 @@
  * <text>, with the exact country, type and seasons — which is what you need to fix a mismatch.
  */
 import { getProvider } from "../src/lib/providers";
-import { SPORT_IDS } from "../src/lib/sports";
+import { SPORT_IDS, leagueLabel } from "../src/lib/sports";
 import { getSetting } from "../src/lib/secrets";
 import { DEFAULT_SOURCES } from "../src/lib/providers";
 
@@ -41,10 +41,11 @@ const needle = findAt >= 0 ? (argv[findAt + 1] ?? "").toLowerCase() : "";
       const ls = p.discoverLeagues ? await p.discoverLeagues() : p.leagues;
       console.log(`   ${ls.length} leagues ${p.discoverLeagues ? "matched on your plan" : "on this source"}:`);
       for (const l of ls) {
-        const cur = await p.seasonGames(l.id, l.season ?? p.season(new Date())).catch((e) => e as Error);
+        const season = l.season ?? p.season(new Date());
+        const cur = await p.seasonGames(l.id, season).catch((e) => e as Error);
         const prev = l.prevSeason ? await p.seasonGames(l.id, l.prevSeason).catch((e) => e as Error) : [];
         const count = (x: unknown) => (Array.isArray(x) ? `${x.length} games (${x.filter((g) => g.status === "FINISHED").length} final, ${x.filter((g) => g.status === "SCHEDULED").length} upcoming)` : `error: ${(x as Error).message}`);
-        console.log(`   · ${l.name} — season ${l.season}: ${count(cur)} | previous ${l.prevSeason ?? "-"}: ${count(prev)}`);
+        console.log(`   · ${leagueLabel(l)} — season ${season}: ${count(cur)} | previous ${l.prevSeason ?? "-"}: ${count(prev)}`);
       }
       if (!ls.length) console.log(`   nothing matched — run with --all to see what your plan does return`);
     } catch (e) { console.log(`   league lookup failed: ${(e as Error).message}`); }

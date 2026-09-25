@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.3 — WNBA: API-Sports does not call it "WNBA"
+- **The women's NBA entry now matches API-Sports' actual naming.** `--find wnba` returns nothing for a
+  paid basketball plan, yet the date feed happily returns "Atlanta Dream W at New York Liberty W": the
+  league is there, it just isn't spelled "WNBA". API-Sports suffixes women's competitions ("NCAA Women")
+  and women's teams ("... W"), so the entry accepts `NBA W`, `NBA-W`, `NBA Women` and `WNBA`, and is
+  asserted not to swallow the men's NBA, the G League, NBB or NBL.
+- Fix: `sourcecheck` printed "season undefined" for the free sources. It logged the league's own season
+  field, which only API-Sports sets, while querying with the fallback — it now prints the season it
+  actually used, and labels leagues with their country.
+
 ## 0.9.2 — leagues show their country
 - **Every league now reads "Lithuania · LKL" rather than "LKL"** — on the board's league filter, the
   heading above each block of games, the game page, the Top list and each leg in the Odds builder.

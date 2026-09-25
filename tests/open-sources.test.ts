@@ -63,14 +63,14 @@ describe("API-Sports league discovery", () => {
     const { apiSports } = await import("@/lib/providers/apiSports");
     const leagues = [
       { id: 12, name: "NBA", type: "League", country: { name: "USA" }, seasons: [{ season: "2024-2025" }, { season: "2025-2026" }, { season: "2026-2027", current: true }] },
-      { id: 13, name: "WNBA", type: "League", country: { name: "USA" }, seasons: [{ season: 2025 }, { season: 2026, current: true }] },
+      { id: 13, name: "NBA W", type: "League", country: { name: "USA" }, seasons: [{ season: 2025 }, { season: 2026, current: true }] },
       { id: 99, name: "NBA - G League", type: "League", country: { name: "USA" }, seasons: [{ season: "2026-2027", current: true }] },
       { id: 120, name: "Euroleague", type: "League", country: { name: "Europe" }, seasons: [{ season: "2025-2026" }, { season: "2026-2027", current: true }] },
       { id: 5, name: "Copa", type: "Cup", country: { name: "Spain" }, seasons: [] },
     ];
     globalThis.fetch = (async () => new Response(JSON.stringify({ response: leagues, errors: [] }), { status: 200 })) as typeof fetch;
     const d = await apiSports("basketball", { key: "x" }).discoverLeagues!();
-    expect(d.map((l) => l.name)).toEqual(["NBA", "WNBA", "Euroleague"]);
+    expect(d.map((l) => l.name)).toEqual(["NBA", "NBA W", "Euroleague"]);
     expect(d[0]).toMatchObject({ id: "12", season: "2026-2027", prevSeason: "2025-2026", focus: true, country: "USA" });
     expect(d[1]).toMatchObject({ season: "2026", prevSeason: "2025", country: "USA" });
     expect(d[2]).toMatchObject({ name: "Euroleague", country: "Europe" });
@@ -153,5 +153,29 @@ describe("league labels", () => {
     expect(leagueLabel({ name: "NBA", country: "" })).toBe("NBA");
     expect(leagueLabel({ name: "NBA" })).toBe("NBA");
     expect(leagueLabel({ name: "NBA", country: null })).toBe("NBA");
+  });
+});
+
+describe("women's basketball league naming", () => {
+  // API-Sports does not use the name "WNBA": it suffixes women's competitions ("NCAA Women")
+  // and women's teams ("Atlanta Dream W"). Asserted against the real WANTED table rather than a
+  // copy of the pattern, so this test cannot drift from what actually ships.
+  const usaRows = async () => {
+    const { WANTED } = await import("@/lib/providers/apiSports");
+    return WANTED.basketball.filter(([c]) => c === "USA");
+  };
+  it("covers the spellings API-Sports actually uses for the women's league", async () => {
+    const usa = await usaRows();
+    const hits = (n: string) => usa.filter(([, re]) => re.test(n)).length;
+    for (const n of ["NBA W", "NBA Women", "NBA-W", "WNBA", "NBA W Regular Season"]) {
+      expect(hits(n), `no USA entry matches "${n}"`).toBeGreaterThan(0);
+    }
+  });
+  it("does not let the women's entry swallow the men's leagues", async () => {
+    const usa = await usaRows();
+    const hits = (n: string) => usa.filter(([, re]) => re.test(n)).length;
+    expect(hits("NBA")).toBe(1);          // the plain NBA entry, and only that one
+    expect(hits("NBA G League")).toBe(1); // its own entry
+    for (const n of ["NBB", "NBL"]) expect(hits(n)).toBe(0);
   });
 });

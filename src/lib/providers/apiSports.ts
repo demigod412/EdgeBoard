@@ -196,7 +196,7 @@ export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: strin
           const seasons = l.seasons.map((x) => ({ s: String(x.season), year: Number(String(x.season).slice(0, 4)) || 0, cur: !!x.current }))
             .sort((a, b) => a.year - b.year);
           const i = seasons.findIndex((x) => x.cur) >= 0 ? seasons.findIndex((x) => x.cur) : seasons.length - 1;
-          out.push({ id: String(l.id), name: l.name, focus: !!focus, season: seasons[i].s, prevSeason: seasons[i - 1]?.s });
+          out.push({ id: String(l.id), name: l.name, country: l.country?.name ?? country, focus: !!focus, season: seasons[i].s, prevSeason: seasons[i - 1]?.s });
         }
       }
       return out;

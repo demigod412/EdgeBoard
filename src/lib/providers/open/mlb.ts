@@ -51,7 +51,7 @@ const flat = (r: Sched) => dedupeMlb((r.dates ?? []).flatMap((d) => d.games).map
 
 export function mlbOpen(): SportProvider {
   return {
-    sport: "baseball", source: "OPEN", name: "MLB Stats API", leagues: [{ id: "MLB", name: "MLB", focus: true }],
+    sport: "baseball", source: "OPEN", name: "MLB Stats API", leagues: [{ id: "MLB", name: "MLB", country: "USA", focus: true }],
     season: (now) => String(now.getUTCFullYear()),
     prevSeason: (s) => String(Number(s) - 1),
     async seasonGames(_l, season) { return flat(await getJson<Sched>(`${BASE}/schedule?sportId=1&season=${season}&gameType=${TYPES}&hydrate=linescore,probablePitcher`)); },

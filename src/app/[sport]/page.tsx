@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { SportId } from "@/lib/sports";
-import { SPORTS } from "@/lib/sports";
+import { SPORTS, leagueLabel } from "@/lib/sports";
 import { getBoard, getLeagues } from "@/lib/queries";
 import { dayKey, fmtWat, isDayKey, watDayStart } from "@/lib/time";
 import { prisma } from "@/lib/db";
@@ -52,7 +52,7 @@ export default async function Board({ params, searchParams }: { params: Promise<
         <div data-no-ptr className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
           <FilterSelect label="League" value={sp.league ?? "all"}
             options={[{ value: "all", label: `All leagues (${leagues.length})`, href: q({ league: undefined }) },
-              ...leagues.map((l) => ({ value: l.id, label: l.name, group: l.country ?? undefined, href: q({ league: l.id }) }))]} />
+              ...leagues.map((l) => ({ value: l.id, label: leagueLabel(l), href: q({ league: l.id }) }))]} />
         </div>
       )}
       <div data-no-ptr className="mb-5 flex gap-1.5 overflow-x-auto pb-1">

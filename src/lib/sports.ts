@@ -22,7 +22,7 @@ export interface SportConfig {
   defaultSegShare: number; // expected share of full-game scoring in the segment
   apiBase: string;
   season: (d: Date) => string;
-  leagues: { id: string; name: string; focus?: boolean }[];
+  leagues: { id: string; name: string; country?: string; focus?: boolean }[];
   accent: string;
 }
 
@@ -32,7 +32,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
     model: "normal", halfHalfLines: true, totalStep: 1, spreadStep: 1, segStep: 1, ladderWidth: 12, defaultSegShare: 0.505, altTotals: [-12, -8, -4, 0, 4, 8, 12], altSegs: [-6, -3, 0, 3, 6], teamAlt: [-6, -3, 0, 3, 6],
     apiBase: "https://v1.basketball.api-sports.io",
     season: (d) => { const y = d.getUTCMonth() >= 8 ? d.getUTCFullYear() : d.getUTCFullYear() - 1; return `${y}-${y + 1}`; },
-    leagues: [{ id: "12", name: "NBA", focus: true }, { id: "120", name: "EuroLeague" }],
+    leagues: [{ id: "12", name: "NBA", country: "USA", focus: true }, { id: "120", name: "EuroLeague", country: "Europe" }],
     accent: "#FF8A3D",
   },
   baseball: {
@@ -40,7 +40,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
     model: "count", halfHalfLines: true, totalStep: 1, spreadStep: 1, segStep: 1, ladderWidth: 3, fixedHandicaps: [-1.5, 1.5], altHandicaps: [-4.5, -3.5, -2.5, -1.5, 1.5, 2.5, 3.5, 4.5], defaultSegShare: 0.556, altTotals: [-2, -1, 0, 1, 2], altSegs: [-1, 0, 1], teamAlt: [-1, 0, 1],
     apiBase: "https://v1.baseball.api-sports.io",
     season: (d) => String(d.getUTCFullYear()),
-    leagues: [{ id: "1", name: "MLB", focus: true }, { id: "5", name: "KBO" }, { id: "2", name: "NPB" }],
+    leagues: [{ id: "1", name: "MLB", country: "USA", focus: true }, { id: "5", name: "KBO", country: "South-Korea" }, { id: "2", name: "NPB", country: "Japan" }],
     accent: "#7DD3FC",
   },
   hockey: {
@@ -48,8 +48,16 @@ export const SPORTS: Record<SportId, SportConfig> = {
     model: "count", halfHalfLines: true, totalStep: 1, spreadStep: 1, segStep: 1, ladderWidth: 2, fixedHandicaps: [-1.5, 1.5], altHandicaps: [-3.5, -2.5, -1.5, 1.5, 2.5, 3.5], defaultSegShare: 0.31, altTotals: [-1, 0, 1, 2], altSegs: [-1, 0, 1], teamAlt: [-1, 0, 1],
     apiBase: "https://v1.hockey.api-sports.io",
     season: (d) => String(d.getUTCMonth() >= 8 ? d.getUTCFullYear() : d.getUTCFullYear() - 1),
-    leagues: [{ id: "57", name: "NHL", focus: true }, { id: "35", name: "KHL" }],
+    leagues: [{ id: "57", name: "NHL", country: "USA", focus: true }, { id: "35", name: "KHL", country: "Russia" }],
     accent: "#A5B4FC",
   },
 };
 export const isSport = (s: string): s is SportId => (SPORT_IDS as string[]).includes(s);
+
+/**
+ * "Lithuania · LKL". Country first because league names repeat constantly across countries —
+ * NBL is Australia, New Zealand, Czechia and Bulgaria; Super League is Israel, Serbia, Iran and
+ * Uzbekistan; A2 is Greece and Italy. The bare name is ambiguous once more than a few leagues sync.
+ */
+export const leagueLabel = (l: { name: string; country?: string | null }) =>
+  (l.country ? `${l.country.replace(/-/g, " ")} · ${l.name}` : l.name);

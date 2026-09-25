@@ -71,8 +71,9 @@ describe("API-Sports league discovery", () => {
     globalThis.fetch = (async () => new Response(JSON.stringify({ response: leagues, errors: [] }), { status: 200 })) as typeof fetch;
     const d = await apiSports("basketball", { key: "x" }).discoverLeagues!();
     expect(d.map((l) => l.name)).toEqual(["NBA", "WNBA", "Euroleague"]);
-    expect(d[0]).toMatchObject({ id: "12", season: "2026-2027", prevSeason: "2025-2026", focus: true });
-    expect(d[1]).toMatchObject({ season: "2026", prevSeason: "2025" });
+    expect(d[0]).toMatchObject({ id: "12", season: "2026-2027", prevSeason: "2025-2026", focus: true, country: "USA" });
+    expect(d[1]).toMatchObject({ season: "2026", prevSeason: "2025", country: "USA" });
+    expect(d[2]).toMatchObject({ name: "Euroleague", country: "Europe" });
   });
 });
 
@@ -135,5 +136,22 @@ describe("retired markets", () => {
       { key: "ot:yes:", kind: "ot", side: "yes", group: "props", label: "Overtime: yes", short: "OT yes", p: 0.23 },
     ] } } as never;
     expect(marketsOf(hockey).map((m) => m.kind).sort()).toEqual(["btts", "ot"]); // hockey keeps both
+  });
+});
+
+import { leagueLabel } from "@/lib/sports";
+describe("league labels", () => {
+  it("puts the country first, because league names repeat across countries", () => {
+    expect(leagueLabel({ name: "LKL", country: "Lithuania" })).toBe("Lithuania · LKL");
+    expect(leagueLabel({ name: "NBA", country: "USA" })).toBe("USA · NBA");
+    // API-Sports hyphenates multi-word countries; read them as words.
+    expect(leagueLabel({ name: "NBL", country: "Czech-Republic" })).toBe("Czech Republic · NBL");
+    expect(leagueLabel({ name: "Premijer Liga", country: "Bosnia-and-Herzegovina" })).toBe("Bosnia and Herzegovina · Premijer Liga");
+  });
+  it("falls back to the bare name when no country is stored", () => {
+    // Rows synced before the country was recorded, and the demo generator.
+    expect(leagueLabel({ name: "NBA", country: "" })).toBe("NBA");
+    expect(leagueLabel({ name: "NBA" })).toBe("NBA");
+    expect(leagueLabel({ name: "NBA", country: null })).toBe("NBA");
   });
 });

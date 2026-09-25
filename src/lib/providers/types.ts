@@ -11,7 +11,7 @@ export interface PGame {
 }
 export interface PLines { total?: number; spread?: number; seg?: number; moneyline?: [number, number]; bookmaker?: string; prices?: Record<string, [number, number]> }
 
-export interface LeagueRef { id: string; name: string; focus?: boolean; season?: string; prevSeason?: string }
+export interface LeagueRef { id: string; name: string; country?: string; focus?: boolean; season?: string; prevSeason?: string }
 
 /** Every data source for EdgeBoard implements this. */
 export interface SportProvider {

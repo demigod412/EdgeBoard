@@ -6,7 +6,7 @@ import { gameInclude } from "@/lib/queries";
 import { selectTop, tipsFor, TOP_N, WINDOWS, type Tip } from "@/lib/top";
 import { flatStakeRoi, latestLines, selectTopValue, valueTips, VALUE, type ValueTip } from "@/lib/value";
 import { GROUP_LABEL, hitOf, TOP_CAPS, type Group } from "@/lib/markets";
-import { SPORTS, SPORT_ENUM, SPORT_IDS, type SportId } from "@/lib/sports";
+import { SPORTS, SPORT_ENUM, SPORT_IDS, leagueLabel, type SportId } from "@/lib/sports";
 import { dayKey, fmtUtc, fmtWat, watDayStart } from "@/lib/time";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { FilterSelect } from "@/components/FilterSelect";
@@ -85,7 +85,7 @@ export default async function Top({ params, searchParams }: { params: Promise<{ 
           <span className="hidden leading-tight md:block"><span className="num block text-sm text-slate-200">{fmtWat(g.startUtc, "EEE HH:mm")}</span><span className="num block text-[10px] text-slate-500">{fmtUtc(g.startUtc)} UTC</span></span>
           <span className="min-w-0">
             <span className="block truncate text-sm text-slate-100">{g.awayTeam.shortName ?? g.awayTeam.name} at {g.homeTeam.shortName ?? g.homeTeam.name}</span>
-            <span className="block truncate text-[11px] text-slate-500"><span className="num md:hidden">{fmtWat(g.startUtc, "EEE HH:mm")} · </span>{all && <span style={{ color: SPORTS[s].accent }}>{SPORTS[s].name} · </span>}{g.league.name}</span>
+            <span className="block truncate text-[11px] text-slate-500"><span className="num md:hidden">{fmtWat(g.startUtc, "EEE HH:mm")} · </span>{all && <span style={{ color: SPORTS[s].accent }}>{SPORTS[s].name} · </span>}{leagueLabel(g.league)}</span>
             <span className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-edge/40 bg-edge/10 px-1.5 py-0.5 text-xs text-edge"><span className="text-[10px] text-edge/70">{grp}</span>{label}</span>
           </span>
           <span className="flex flex-col items-end gap-1"><span className="num text-xl font-semibold text-slate-50">{pct(p)}</span>{right}</span>

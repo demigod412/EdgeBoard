@@ -7,7 +7,7 @@ import { marketsOf } from "@/lib/picks";
 import { GROUP_LABEL, hitOf, type Group } from "@/lib/markets";
 import { buildSlips, legHint, oneInN, SAFE_MAX_LEG_ODDS, type Candidate } from "@/lib/builder";
 import { latestLines, oddsFor } from "@/lib/value";
-import { SPORTS, SPORT_ENUM, SPORT_IDS, type SportId } from "@/lib/sports";
+import { SPORTS, SPORT_ENUM, SPORT_IDS, leagueLabel, type SportId } from "@/lib/sports";
 import { dayKey, fmtWat } from "@/lib/time";
 import { BuilderResult } from "@/components/BuilderResult";
 import { FilterSelect } from "@/components/FilterSelect";
@@ -52,7 +52,7 @@ export default async function Builder({ params, searchParams }: {
     return marketsOf(p).map((m) => {
       const price = oddsFor(m, lines);
       return {
-        matchId: g.id, league: g.league.name, startMs: +g.startUtc, match: `${A} at ${H}`, label: m.label, market: m.key,
+        matchId: g.id, league: leagueLabel(g.league), startMs: +g.startUtc, match: `${A} at ${H}`, label: m.label, market: m.key,
         group: m.group, p: m.p, odds: price && price > 1.01 ? price : 1 / m.p, real: !!price, band: p.band,
       };
     });
@@ -75,7 +75,7 @@ export default async function Builder({ params, searchParams }: {
   for (const l of locked) { const k = dayKey(l.game.startUtc); byDay.set(k, [...(byDay.get(k) ?? []), l]); }
   const record = [...byDay.entries()].sort(([a], [b]) => b.localeCompare(a)).flatMap(([day, ps]) => {
     const cands: Candidate[] = ps.flatMap((x) => marketsOf(x).map((m) => ({
-      matchId: x.gameId, league: x.game.league.name, startMs: +x.game.startUtc, match: `${x.game.awayTeam.name} at ${x.game.homeTeam.name}`,
+      matchId: x.gameId, league: leagueLabel(x.game.league), startMs: +x.game.startUtc, match: `${x.game.awayTeam.name} at ${x.game.homeTeam.name}`,
       label: m.label, market: m.key, group: m.group, p: m.p, odds: 1 / m.p, real: false, band: x.band })));
     const [built] = buildSlips(cands, { target, maxLegs, mode: "safe", band: "LOW", maxLegOdds: legCap }, 1);
     if (!built) return [];

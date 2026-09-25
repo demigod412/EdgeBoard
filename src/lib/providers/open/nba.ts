@@ -74,7 +74,7 @@ export function nbaOpen(key: string): SportProvider {
   };
   return {
     sport: "basketball", source: "OPEN", name: "balldontlie",
-    leagues: [{ id: "NBA", name: "NBA", focus: true }, { id: "WNBA", name: "WNBA", focus: true, season: String(new Date().getUTCFullYear()), prevSeason: String(new Date().getUTCFullYear() - 1) }],
+    leagues: [{ id: "NBA", name: "NBA", country: "USA", focus: true }, { id: "WNBA", name: "WNBA", country: "USA", focus: true, season: String(new Date().getUTCFullYear()), prevSeason: String(new Date().getUTCFullYear() - 1) }],
     season: (now) => String(now.getUTCMonth() >= 8 ? now.getUTCFullYear() : now.getUTCFullYear() - 1),
     prevSeason: (s) => String(Number(s) - 1),
     async seasonGames(league, season) { return pages(`seasons[]=${season}`, league); },

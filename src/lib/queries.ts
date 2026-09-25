@@ -19,7 +19,7 @@ export async function getBoard(sport: SportId, o: { from: Date; to: Date; league
 }
 export async function getLeagues(sport: SportId) {
   const { source } = await dataMode(sport);
-  return prisma.league.findMany({ where: { sport: SPORT_ENUM[sport], source }, orderBy: [{ focus: "desc" }, { name: "asc" }] });
+  return prisma.league.findMany({ where: { sport: SPORT_ENUM[sport], source }, orderBy: [{ focus: "desc" }, { country: "asc" }, { name: "asc" }] });
 }
 export async function getGame(id: string) {
   const g = await prisma.game.findUnique({ where: { id }, include: { ...gameInclude, lines: { orderBy: { fetchedAt: "desc" }, take: 40 } } });

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getGame } from "@/lib/queries";
-import { SPORTS, type SportId } from "@/lib/sports";
+import { SPORTS, leagueLabel, type SportId } from "@/lib/sports";
 import { picksOf, laddersOf, marketsOf } from "@/lib/picks";
 import { GROUP_LABEL, hitOf, type Group } from "@/lib/markets";
 import { bestTip } from "@/lib/top";
@@ -50,7 +50,7 @@ export default async function GamePage({ params }: { params: Promise<{ sport: Sp
 
   return (
     <article>
-      <p className="text-xs text-slate-400">{g.league.name}</p>
+      <p className="text-xs text-slate-400">{leagueLabel(g.league)}</p>
       <header className="relative mt-2 overflow-hidden rounded-[20px] border hairline bg-[radial-gradient(120%_90%_at_50%_0%,#13203a_0%,#0B1220_55%,#070B14_100%)] px-4 pb-6 pt-5 md:px-8">
         <div className="flex items-center justify-between text-xs text-slate-400">
           <span className="num">{fmtWat(g.startUtc, "EEE d MMM, HH:mm")} WAT <span className="text-slate-600">/ {fmtUtc(g.startUtc)} UTC</span></span>

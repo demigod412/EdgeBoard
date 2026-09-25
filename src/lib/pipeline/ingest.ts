@@ -31,7 +31,8 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
       if (!games.length) { report[label(L)] = "no games"; continue; }
       const league = await db.league.upsert({
         where: { source_sport_externalId_season: { source: SRC, sport: S, externalId: L.id, season } },
-        update: { name: L.name, focus: !!L.focus }, create: { source: SRC, sport: S, externalId: L.id, season, name: L.name, focus: !!L.focus },
+        update: { name: L.name, country: L.country ?? "", focus: !!L.focus },
+        create: { source: SRC, sport: S, externalId: L.id, season, name: L.name, country: L.country ?? "", focus: !!L.focus },
       });
       const team = async (t: PGame["home"]) => db.team.upsert({
         where: { source_sport_externalId_leagueId: { source: SRC, sport: S, externalId: t.externalId, leagueId: league.id } },

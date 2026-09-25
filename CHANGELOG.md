@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.2 — leagues show their country
+- **Every league now reads "Lithuania · LKL" rather than "LKL"** — on the board's league filter, the
+  heading above each block of games, the game page, the Top list and each leg in the Odds builder.
+  With 51 leagues syncing, bare names were ambiguous or meaningless: NBL is Australia, New Zealand,
+  Czechia and Bulgaria; Super League is Israel, Serbia, Iran and Uzbekistan; A2 is Greece and Italy.
+  The league filter is also ordered by country now, and multi-word countries read as words
+  ("Czech Republic", not "Czech-Republic").
+- The `country` column has existed on `League` since the schema was written but nothing ever wrote to
+  it, so it was empty everywhere. API-Sports discovery now records the country it files each league
+  under, and the free sources label theirs. **It fills in on the next sync per sport** — leagues synced
+  before this update keep showing the bare name until then.
+- Fix: the sync report was keyed by league name, so the several countries running a "Super League",
+  "NBL", "Premier League", "National League", "Extraliga" or "Superliga" overwrote each other and a
+  league returning no games could hide behind a healthy namesake. The sync itself was unaffected
+  (distinct provider ids, distinct rows); only the report lied. Repeated names now carry the id.
+
 ## 0.9.1 — see why a league is missing
 - **`npm run sourcecheck -- --find wnba`** prints the raw rows from your plan's league list whose name
   or country contains that text, with the exact name, country, type, every season it offers and whether

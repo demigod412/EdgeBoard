@@ -50,7 +50,7 @@ type Score = { games?: NhlGame[] };
 
 export function nhlOpen(): SportProvider {
   return {
-    sport: "hockey", source: "OPEN", name: "NHL API", leagues: [{ id: "NHL", name: "NHL", focus: true }],
+    sport: "hockey", source: "OPEN", name: "NHL API", leagues: [{ id: "NHL", name: "NHL", country: "USA", focus: true }],
     season: (now) => { const y = now.getUTCMonth() >= 8 ? now.getUTCFullYear() : now.getUTCFullYear() - 1; return `${y}${y + 1}`; },
     prevSeason: (s) => `${Number(s.slice(0, 4)) - 1}${Number(s.slice(0, 4))}`,
     async seasonGames(_l, season) {

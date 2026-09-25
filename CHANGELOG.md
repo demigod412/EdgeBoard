@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.1 — see why a league is missing
+- **`npm run sourcecheck -- --find wnba`** prints the raw rows from your plan's league list whose name
+  or country contains that text, with the exact name, country, type, every season it offers and whether
+  it is being synced. Leagues are matched by country + name, so a competition the provider spells
+  differently is skipped in silence — this turns "it isn't showing" into a one-line answer.
+- **`npm run sourcecheck -- --all`** lists every competition your plan returns that is *not* being
+  synced, grouped by country, with cups marked.
+- **sourcecheck now names the source in use** and says plainly when a sport is on the free source, since
+  every sport defaults to it and a paid API-Sports plan does nothing until that sport is switched over
+  in Settings → Data source. This is the usual reason an API-Sports league is missing.
+- The WNBA pattern is no longer strictly anchored, so a name like "WNBA Regular Season" also matches.
+  Discovery itself was already correct and unit-tested: given API-Sports' league list, it picks WNBA
+  with its single-year season (2026, previous 2025) rather than the NBA's two-year format.
+
 ## 0.9.0 — safest capped at 1.60 a leg, many more leagues, NCAA divisions fixed
 - **Builder → Safest never uses a leg priced above 1.60.** A long target is reached with more,
   shorter picks rather than a few risky ones. The cap is absolute: when a target cannot be reached

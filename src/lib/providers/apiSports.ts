@@ -87,9 +87,12 @@ export function parseOdds(sport: SportId, resp: AnyObj[]): PLines {
  *   all   → take EVERY league matching the pattern, not just the first. Needed where one
  *           name covers several competitions (NCAA divisions, junior leagues).
  */
+/** One row of API-Sports' /leagues response, as far as we use it. */
+type ApiLeague = { id: number; name: string; type?: string; country?: { name?: string }; seasons?: { season: string | number; current?: boolean }[] };
+
 export const WANTED: Record<SportId, [string, RegExp, boolean?, boolean?][]> = {
   basketball: [
-    ["USA", /^NBA$/i, true], ["USA", /^WNBA$/i, true], ["USA", /^NCAA(\b|$)/i, true, true],
+    ["USA", /^NBA$/i, true], ["USA", /^WNBA\b/i, true], ["USA", /^NCAA(\b|$)/i, true, true],
     ["USA", /^NBA G League$|^G League$/i],
     // Europe-wide competitions
     ["Europe", /^Euroleague$/i, true], ["Europe", /^Eurocup$/i], ["Europe", /^Champions League$/i],
@@ -172,9 +175,15 @@ export function apiSports(sport: SportId, opts: { key?: string; rapidKey?: strin
     sport, source: "API_SPORTS", name: "API-Sports", leagues: cfg.leagues,
     season: (now: Date) => cfg.season(now),
     prevSeason: (season: string) => (/-/.test(season) ? season.split("-").map((y) => String(Number(y) - 1)).join("-") : String(Number(season) - 1)),
+    async rawLeagues() {
+      const all = (await get(`/leagues`)) as unknown as ApiLeague[];
+      return all.map((x) => ({
+        id: String(x.id), name: x.name, country: x.country?.name ?? "—", type: x.type ?? "League",
+        seasons: (x.seasons ?? []).map((v) => `${v.season}${v.current ? "*" : ""}`),
+      }));
+    },
     async discoverLeagues(): Promise<LeagueRef[]> {
-      type L = { id: number; name: string; type?: string; country?: { name?: string }; seasons?: { season: string | number; current?: boolean }[] };
-      const all = (await get(`/leagues`)) as unknown as L[];
+      const all = (await get(`/leagues`)) as unknown as ApiLeague[];
       const out: LeagueRef[] = [];
       for (const [country, re, focus, wantAll] of WANTED[sport]) {
         const hits = all.filter((x) => (x.country?.name ?? "").toLowerCase() === country.toLowerCase() && re.test(x.name.trim()) && (x.type ?? "League") !== "Cup");

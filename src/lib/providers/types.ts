@@ -21,6 +21,12 @@ export interface SportProvider {
   leagues: LeagueRef[];
   /** Optional live league discovery (API-Sports): which of the wanted leagues exist on your plan, with their current season. */
   discoverLeagues?(): Promise<LeagueRef[]>;
+  /**
+   * Every competition the plan lists, unfiltered by WANTED. Diagnostics only (`sourcecheck --all`):
+   * leagues are matched by country + name, so a provider that spells one differently is skipped
+   * silently. This is how you see what was skipped and why.
+   */
+  rawLeagues?(): Promise<{ id: string; name: string; country: string; type: string; seasons: string[] }[]>;
   season(now: Date): string;
   prevSeason(season: string): string;
   seasonGames(leagueId: string, season: string): Promise<PGame[]>;

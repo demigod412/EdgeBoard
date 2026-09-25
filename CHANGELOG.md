@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.4 — WNBA confirmed, G League picked up
+- **WNBA is synced and now reads "USA · WNBA".** A live plan confirms API-Sports files it as
+  **"NBA W"** (id 13, 345 games in season 2026). The stored name stays the provider's, but the UI
+  renames it — nobody calls it "NBA W".
+  Note the WNBA plays May–September, so the 2026 season is complete: it contributes history and
+  calibration now, and upcoming games return when the 2027 season starts.
+- **Fix: the NBA G League was never synced.** API-Sports calls it **"NBA - G League"**, hyphenated, and
+  the entry looked for "NBA G League". It matches either spelling now and displays unhyphenated. The
+  discovery test had the hyphenated name in its fixture while asserting the league was absent, so it
+  was quietly documenting the bug; it now asserts the league is found.
+- Deliberately still not synced, from the same USA list: the Las Vegas, Sacramento, Utah, Orlando and
+  Salt Lake City Summer Leagues (exhibition), and NBA Cup / NBA In-Season Tournament, whose fixtures
+  are regular-season games that would be counted twice under a second league.
+
 ## 0.9.3 — WNBA: API-Sports does not call it "WNBA"
 - **The women's NBA entry now matches API-Sports' actual naming.** `--find wnba` returns nothing for a
   paid basketball plan, yet the date feed happily returns "Atlanta Dream W at New York Liberty W": the

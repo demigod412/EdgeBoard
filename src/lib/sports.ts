@@ -55,9 +55,21 @@ export const SPORTS: Record<SportId, SportConfig> = {
 export const isSport = (s: string): s is SportId => (SPORT_IDS as string[]).includes(s);
 
 /**
+ * Provider names that read badly on screen. API-Sports files the women's NBA as "NBA W" and
+ * hyphenates the G League; nobody calls them that. Display only — matching and the stored
+ * league name still use the provider's own string.
+ */
+const DISPLAY_NAME: Record<string, string> = {
+  "NBA W": "WNBA",
+  "NBA - G League": "NBA G League",
+};
+
+/**
  * "Lithuania · LKL". Country first because league names repeat constantly across countries —
  * NBL is Australia, New Zealand, Czechia and Bulgaria; Super League is Israel, Serbia, Iran and
  * Uzbekistan; A2 is Greece and Italy. The bare name is ambiguous once more than a few leagues sync.
  */
-export const leagueLabel = (l: { name: string; country?: string | null }) =>
-  (l.country ? `${l.country.replace(/-/g, " ")} · ${l.name}` : l.name);
+export const leagueLabel = (l: { name: string; country?: string | null }) => {
+  const name = DISPLAY_NAME[l.name] ?? l.name;
+  return l.country ? `${l.country.replace(/-/g, " ")} · ${name}` : name;
+};

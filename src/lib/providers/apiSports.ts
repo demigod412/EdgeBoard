@@ -93,7 +93,7 @@ type ApiLeague = { id: number; name: string; type?: string; country?: { name?: s
 export const WANTED: Record<SportId, [string, RegExp, boolean?, boolean?][]> = {
   basketball: [
     ["USA", /^NBA$/i, true], ["USA", /^(W\.?NBA|NBA[\s-]?W(omen)?)\b/i, true], ["USA", /^NCAA(\b|$)/i, true, true],
-    ["USA", /^NBA G League$|^G League$/i],
+    ["USA", /^NBA[\s-]*G League$|^G League$/i],
     // Europe-wide competitions
     ["Europe", /^Euroleague$/i, true], ["Europe", /^Eurocup$/i], ["Europe", /^Champions League$/i],
     ["Europe", /^FIBA Europe Cup$/i], ["Europe", /^ABA League$|^Adriatic League$/i],

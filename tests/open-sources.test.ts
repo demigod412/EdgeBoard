@@ -70,10 +70,14 @@ describe("API-Sports league discovery", () => {
     ];
     globalThis.fetch = (async () => new Response(JSON.stringify({ response: leagues, errors: [] }), { status: 200 })) as typeof fetch;
     const d = await apiSports("basketball", { key: "x" }).discoverLeagues!();
-    expect(d.map((l) => l.name)).toEqual(["NBA", "NBA W", "Euroleague"]);
+    // "NBA - G League" is the provider's real spelling and used to be missed entirely, because the
+    // entry looked for "NBA G League" without the hyphen.
+    expect(d.map((l) => l.name)).toEqual(["NBA", "NBA W", "NBA - G League", "Euroleague"]);
     expect(d[0]).toMatchObject({ id: "12", season: "2026-2027", prevSeason: "2025-2026", focus: true, country: "USA" });
-    expect(d[1]).toMatchObject({ season: "2026", prevSeason: "2025", country: "USA" });
-    expect(d[2]).toMatchObject({ name: "Euroleague", country: "Europe" });
+    expect(d[1]).toMatchObject({ id: "13", season: "2026", prevSeason: "2025", country: "USA" }); // single-year WNBA season
+    expect(d[3]).toMatchObject({ name: "Euroleague", country: "Europe" });
+    // The Cup row has no seasons and is excluded either way.
+    expect(d.some((l) => l.name === "Copa")).toBe(false);
   });
 });
 
@@ -148,6 +152,13 @@ describe("league labels", () => {
     expect(leagueLabel({ name: "NBL", country: "Czech-Republic" })).toBe("Czech Republic · NBL");
     expect(leagueLabel({ name: "Premijer Liga", country: "Bosnia-and-Herzegovina" })).toBe("Bosnia and Herzegovina · Premijer Liga");
   });
+  it("renames the provider strings that read badly", () => {
+    // Confirmed from a live plan: API-Sports calls the women's NBA "NBA W" (id 13) and
+    // hyphenates the G League as "NBA - G League" (id 20).
+    expect(leagueLabel({ name: "NBA W", country: "USA" })).toBe("USA · WNBA");
+    expect(leagueLabel({ name: "NBA - G League", country: "USA" })).toBe("USA · NBA G League");
+    expect(leagueLabel({ name: "NBA", country: "USA" })).toBe("USA · NBA");
+  });
   it("falls back to the bare name when no country is stored", () => {
     // Rows synced before the country was recorded, and the demo generator.
     expect(leagueLabel({ name: "NBA", country: "" })).toBe("NBA");
@@ -175,7 +186,8 @@ describe("women's basketball league naming", () => {
     const usa = await usaRows();
     const hits = (n: string) => usa.filter(([, re]) => re.test(n)).length;
     expect(hits("NBA")).toBe(1);          // the plain NBA entry, and only that one
-    expect(hits("NBA G League")).toBe(1); // its own entry
+    expect(hits("NBA - G League")).toBe(1); // the real provider spelling, hyphenated
+    expect(hits("NBA G League")).toBe(1);   // and the unhyphenated form
     for (const n of ["NBB", "NBL"]) expect(hits(n)).toBe(0);
   });
 });

@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { fitBinary } from "../model/calibration";
 import { MODEL_VERSION } from "../model/constants";
-import { SPORT_ENUM, type SportId } from "../sports";
+import { SPORT_ENUM, SPORTS, type SportId } from "../sports";
 import type { SportProvider } from "../providers/types";
 
 const LOCK_MIN = Number(process.env.PREDICTION_LOCK_MINUTES ?? 15);
@@ -28,7 +28,7 @@ export async function lockDue(db: PrismaClient, now = new Date()) {
 /** Results refresh: only when a game that should have ended is not marked finished; one request per date. */
 export async function syncResults(db: PrismaClient, p: SportProvider, now = new Date()) {
   const S = SPORT_ENUM[p.sport];
-  const minutes = p.sport === "baseball" ? 200 : p.sport === "hockey" ? 160 : 150;
+  const minutes = SPORTS[p.sport].liveMinutes;
   const pending = await db.game.findMany({ where: { sport: S, source: p.source, status: { in: ["SCHEDULED", "LIVE"] }, startUtc: { lte: new Date(now.getTime() - minutes * 60_000), gte: new Date(now.getTime() - 3 * 86_400_000) } }, select: { startUtc: true } });
   if (!pending.length) return { checked: 0, updated: 0 };
   const dates = [...new Set(pending.map((g) => g.startUtc.toISOString().slice(0, 10)))];

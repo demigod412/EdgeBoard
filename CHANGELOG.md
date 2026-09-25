@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.10.0 — Upcoming / Live / Finished on every board
+- **Three tabs on each sport's board**, with a count on each: **Upcoming** (not started — the default,
+  since the board's job is the games you can still bet on), **Live** (being played now, with a pulsing
+  dot) and **Finished** (played). The date strip, league filter and market view all still apply, and the
+  tab is carried in the URL (`?show=live`) so a link keeps it.
+- **A tab cannot rely on the stored status, so it does not.** A provider status of LIVE is only written
+  when a job happens to run while the game is in progress, and a full sync runs every three hours — so
+  a 19:00 tip-off usually still reads SCHEDULED until 22:00, long after it ended. A Live tab on the raw
+  status would sit empty through most of a game night. Start time decides for anything still SCHEDULED,
+  **using each sport's own length**: basketball 150 minutes, hockey 160, baseball 200. At 170 minutes in,
+  a ball game is very likely still going while the basketball finished an hour ago — one number for all
+  three would be wrong for two of them. A game the provider *has* reported as LIVE gets an extra hour
+  before that flag is treated as stale, so multiple overtimes are not filed as finished mid-game.
+- Those per-sport lengths now live in the sport config and are shared with the results job, which had
+  the same three numbers written inline — they can no longer drift apart.
+- **A row shows a score whenever one exists**, not only once a game is marked final, so a game caught in
+  progress shows its running score. Finished games read `Final` (with `(OT)`, `(OT/SO)` or `(extras)` as
+  before); one that has been played but whose score has not arrived reads `result pending`.
+- **Postponed and cancelled games appear in no tab** — not played, not bettable — but are counted in a
+  line under the tabs rather than disappearing silently. Empty states name what the date *does* have and
+  link straight to that tab.
+
 ## 0.9.5 — readable sync report
 - The sync report keys leagues by **"Israel · Super League"** rather than "Super League #51". Provider
   ids disambiguated the clashes in 0.9.2 because leagues did not carry a country yet; they do now, and

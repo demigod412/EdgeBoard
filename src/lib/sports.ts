@@ -20,6 +20,11 @@ export interface SportConfig {
   altSegs: number[];         // same for the first-segment total
   teamAlt: number[];         // team-total lines, as offsets from the team's expected score
   defaultSegShare: number; // expected share of full-game scoring in the segment
+  /**
+   * Roughly how long a game runs, wall-clock, including breaks and a normal amount of overtime.
+   * Used both to decide a game should have ended (results job) and which board tab it belongs in.
+   */
+  liveMinutes: number;
   apiBase: string;
   season: (d: Date) => string;
   leagues: { id: string; name: string; country?: string; focus?: boolean }[];
@@ -30,6 +35,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
   basketball: {
     id: "basketball", name: "Basketball", unit: "points", handicapName: "Spread", segmentName: "1st half", segmentShort: "1H",
     model: "normal", halfHalfLines: true, totalStep: 1, spreadStep: 1, segStep: 1, ladderWidth: 12, defaultSegShare: 0.505, altTotals: [-12, -8, -4, 0, 4, 8, 12], altSegs: [-6, -3, 0, 3, 6], teamAlt: [-6, -3, 0, 3, 6],
+    liveMinutes: 150,
     apiBase: "https://v1.basketball.api-sports.io",
     season: (d) => { const y = d.getUTCMonth() >= 8 ? d.getUTCFullYear() : d.getUTCFullYear() - 1; return `${y}-${y + 1}`; },
     leagues: [{ id: "12", name: "NBA", country: "USA", focus: true }, { id: "120", name: "EuroLeague", country: "Europe" }],
@@ -38,6 +44,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
   baseball: {
     id: "baseball", name: "Baseball", unit: "runs", handicapName: "Run line", segmentName: "First 5 innings", segmentShort: "F5",
     model: "count", halfHalfLines: true, totalStep: 1, spreadStep: 1, segStep: 1, ladderWidth: 3, fixedHandicaps: [-1.5, 1.5], altHandicaps: [-4.5, -3.5, -2.5, -1.5, 1.5, 2.5, 3.5, 4.5], defaultSegShare: 0.556, altTotals: [-2, -1, 0, 1, 2], altSegs: [-1, 0, 1], teamAlt: [-1, 0, 1],
+    liveMinutes: 200,
     apiBase: "https://v1.baseball.api-sports.io",
     season: (d) => String(d.getUTCFullYear()),
     leagues: [{ id: "1", name: "MLB", country: "USA", focus: true }, { id: "5", name: "KBO", country: "South-Korea" }, { id: "2", name: "NPB", country: "Japan" }],
@@ -46,6 +53,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
   hockey: {
     id: "hockey", name: "Ice hockey", unit: "goals", handicapName: "Puck line", segmentName: "1st period", segmentShort: "P1",
     model: "count", halfHalfLines: true, totalStep: 1, spreadStep: 1, segStep: 1, ladderWidth: 2, fixedHandicaps: [-1.5, 1.5], altHandicaps: [-3.5, -2.5, -1.5, 1.5, 2.5, 3.5], defaultSegShare: 0.31, altTotals: [-1, 0, 1, 2], altSegs: [-1, 0, 1], teamAlt: [-1, 0, 1],
+    liveMinutes: 160,
     apiBase: "https://v1.hockey.api-sports.io",
     season: (d) => String(d.getUTCMonth() >= 8 ? d.getUTCFullYear() : d.getUTCFullYear() - 1),
     leagues: [{ id: "57", name: "NHL", country: "USA", focus: true }, { id: "35", name: "KHL", country: "Russia" }],

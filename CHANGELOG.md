@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.10.2 — markets earn their place; a loading bar
+- **Legs are now weighted by how well each market has actually delivered.** `Candidate.trust` existed,
+  was used in the ranking and was **never once set** — always 1, so the field did nothing. The ledger
+  already records each market type's realised hit rate against the average probability the model put on
+  it, so that ratio now becomes the weighting: a strong total landing 71% on calls that claimed 78% runs
+  at 0.91 and gets ranked behind a market that keeps its promises.
+  Guarded against chasing noise: under 25 settled calls a market is ignored entirely, the ratio is
+  shrunk toward neutral by sample size (half weight at 60 calls), and clamped to 0.75–1.08 — a market
+  can be marked down hard but never promoted much, because being lucky is not being good. Computed over
+  six months during each sport's sync and stored per sport, so the builder reads one small row rather
+  than re-reading the ledger every time you change the target. Keyed by the same market label the
+  accuracy page's hit table uses, so the two can never disagree about what a market is.
+- **New Confidence control: Medium and High, or High only.**
+- **A loading bar across the top of the app whenever a page is loading.** `loading.tsx` only covers a
+  move to a different route, and most waiting here is the *same* route with different search params —
+  the Upcoming/Live/Finished tab, the date, a league, a market view, the builder's target. Every page is
+  rendered against the database, so those took a second or two with nothing on screen, which reads as
+  the app having hung. Clicks are caught app-wide from one place rather than by wrapping every link, it
+  clears when the page actually changes, and it times out so a cancelled navigation cannot leave it
+  stuck on. Respects `prefers-reduced-motion`.
+
 ## 0.10.1 — the builder was choosing the LEAST likely legs; even leg prices
 - **Fix: "Safest" systematically preferred the less likely of two equally priced legs.** The candidate
   ranking divided log(p) by *minus* the price, which inverts it: both terms are negative, so the score

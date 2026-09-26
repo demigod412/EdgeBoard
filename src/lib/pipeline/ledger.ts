@@ -2,6 +2,10 @@ import type { PrismaClient } from "@prisma/client";
 import { fitBinary } from "../model/calibration";
 import { MODEL_VERSION } from "../model/constants";
 import { SPORT_ENUM, SPORTS, type SportId } from "../sports";
+import { setSetting } from "../secrets";
+import { marketTrust, trustKey } from "../trust";
+import { computeAccuracy, type ScoredCall } from "../accuracy";
+import { marketsOf } from "../picks";
 import type { SportProvider } from "../providers/types";
 
 const LOCK_MIN = Number(process.env.PREDICTION_LOCK_MINUTES ?? 15);
@@ -64,6 +68,28 @@ export async function settle(db: PrismaClient, sport?: SportId) {
 
 /** Refit calibration per market from locked + settled predictions. */
 /** Live calibration is fitted from LIVE calls only (demo games never influence live probabilities). */
+/**
+ * Recompute how much each market delivers against what it claims, and store it for the builder.
+ * Six months, so a market since corrected is not judged on last season, and stored rather than
+ * computed per request: the builder would otherwise re-read the ledger on every target change.
+ */
+export async function refreshMarketTrust(db: PrismaClient, sport: SportId, source: "API_SPORTS" | "OPEN", days = 180) {
+  const rows = await db.prediction.findMany({
+    where: { sport: SPORT_ENUM[sport], lockedAt: { not: null }, game: { source, results: { some: {} }, startUtc: { gte: new Date(Date.now() - days * 86_400_000) } } },
+    include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 } } } },
+  });
+  const calls: ScoredCall[] = rows.map((p) => {
+    const r = p.game.results[0];
+    return { start: p.game.startUtc, band: p.band, pHome: p.calHomeWin, markets: marketsOf(p),
+      result: { h: r.homeScore, a: r.awayScore, hSeg: r.homeSeg, aSeg: r.awaySeg, hReg: r.hReg, aReg: r.aReg, extra: r.extraTime ?? undefined, hFirst: r.hFirst, aFirst: r.aFirst },
+      market: null };
+  });
+  const report = computeAccuracy(calls);
+  const t = marketTrust(report.markets.map((m) => ({ key: m.label, n: m.n, hit: m.hit, avgP: m.avgP })));
+  await setSetting(trustKey(sport), t);
+  return { calls: report.n, markets: Object.keys(t).length };
+}
+
 export async function refitCalibration(db: PrismaClient, sport: SportId, source: "API_SPORTS" | "OPEN") {
   const rows = await db.prediction.findMany({ where: { sport: SPORT_ENUM[sport], modelVersion: MODEL_VERSION, lockedAt: { not: null }, game: { source, results: { some: {} } } }, include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 } } } } });
   const data: Record<string, { p: number[]; y: (0 | 1)[] }> = { win: { p: [], y: [] }, total: { p: [], y: [] }, spread: { p: [], y: [] }, seg_total: { p: [], y: [] } };

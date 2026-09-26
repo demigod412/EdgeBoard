@@ -6,6 +6,8 @@ import "./globals.css";
 import { BottomTabs, LeftRail } from "@/components/Chrome";
 import { Disclaimer } from "@/components/Disclaimer";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { RouteProgress } from "@/components/RouteProgress";
+import { Suspense } from "react";
 import { isSport, type SportId } from "@/lib/sports";
 import { ACCESS_COOKIE, IDLE_MINUTES, isOpenPath, readToken } from "@/lib/access";
 import { secretFor } from "@/lib/accessSecret";
@@ -39,6 +41,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${GeistSans.variable} ${mono.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
+        {/* Suspense because RouteProgress reads the query string. */}
+        <Suspense fallback={null}><RouteProgress /></Suspense>
         {locked ? <UnlockScreen minutes={IDLE_MINUTES} /> : <>
         <div className="flex">
           <LeftRail fallback={fallback} />

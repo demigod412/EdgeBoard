@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { SPORT_ENUM, leagueLabel, type SportId } from "../sports";
 import type { PGame, SportProvider } from "../providers/types";
 import { rateAndPredictLeague } from "./predict";
-import { lockDue, refitCalibration, settle } from "./ledger";
+import { lockDue, refitCalibration, refreshMarketTrust, settle } from "./ledger";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -84,6 +84,8 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
     report.locked = await lockDue(db, now);
     report.settled = await settle(db, sport);
     report.calibrationRows = await refitCalibration(db, sport, SRC);
+    // How well each market has actually delivered, for the builder's ranking.
+    report.marketTrust = await refreshMarketTrust(db, sport, SRC);
     await db.syncLog.update({ where: { id: log.id }, data: { ok: true, finishedAt: new Date(), message: JSON.stringify(report).slice(0, 2000) } });
     return report;
   } catch (e) {

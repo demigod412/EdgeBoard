@@ -12,8 +12,12 @@ const agg = (rows: { p: number; y: boolean }[]): Metrics => {
 };
 export const devig2 = (home: number, away: number) => (1 / home) / (1 / home + 1 / away);
 
-/** Market-type label for the hit table (lines collapsed: "Total over", "Team total", "Overtime yes"…). */
-const kindLabel = (m: Mkt) => ({
+/**
+ * Market-type label for the hit table (lines collapsed: "Total over", "Team total", "Overtime yes"…).
+ * Exported because the ledger's per-market record is keyed by it, and the builder looks up a market's
+ * trust under the same name — the two must agree or the weighting silently does nothing.
+ */
+export const kindLabel = (m: Mkt) => ({
   win: "Win", total: m.strong ? "Strong total" : "Total (main line)", spread: m.strong ? "Strong handicap" : "Handicap (main line)", seg: m.strong ? "Strong segment total" : "Segment total (main line)",
   team_total: "Team total (strong line)", margin: "Winning margin band", ot: m.side === "yes" ? "Overtime / extras: yes" : "Overtime / extras: no",
   reg3: "Regulation 3-way", seg3: "Segment 3-way", btts: "Both teams score", nrfi: m.side === "no_run" ? "NRFI" : "YRFI",

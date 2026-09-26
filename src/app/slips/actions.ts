@@ -101,10 +101,21 @@ export async function mergeInto(targetId: string, sourceId: string): Promise<Sli
 /** Resolve games + markets and ask Sportybet for a code. Shared by slips and the Blend builder. */
 async function bookLegs(legs: { gameId: string; market: string; label: string }[]) {
   const games = await prisma.game.findMany({ where: { id: { in: legs.map((l) => l.gameId) } }, include: { homeTeam: true, awayTeam: true, predictions: { orderBy: { revision: "desc" }, take: 1 } } });
-  const r = await sportybetBook(legs.flatMap((l) => {
-    const g = games.find((x) => x.id === l.gameId), m = g?.predictions[0] ? marketsOf(g.predictions[0]).find((x) => x.key === l.market) : null, sp = g ? sportOf(g.sport) : null;
-    return g && m && sp && g.startUtc > new Date() ? [{ gameId: g.id, sport: sp, mkt: m, home: g.homeTeam.name, away: g.awayTeam.name, start: g.startUtc, label: l.label }] : [];
-  }));
+  // A leg that cannot be resolved locally used to vanish from the request and never reach `unbookable`,
+  // so the slip came back short with nothing saying why. Say what went missing and why.
+  const dropped: { label: string; reason: string }[] = [];
+  const bookable = legs.flatMap((l) => {
+    const g = games.find((x) => x.id === l.gameId);
+    const sp = g ? sportOf(g.sport) : null;
+    const m = g?.predictions[0] ? marketsOf(g.predictions[0]).find((x) => x.key === l.market) : null;
+    if (!g) { dropped.push({ label: l.label, reason: "game no longer in the database" }); return []; }
+    const where = `${g.awayTeam.name} at ${g.homeTeam.name}: ${l.label}`;
+    if (g.startUtc <= new Date()) { dropped.push({ label: where, reason: "already started" }); return []; }
+    if (!sp) { dropped.push({ label: where, reason: "unknown sport" }); return []; }
+    if (!m) { dropped.push({ label: where, reason: "market no longer offered on the latest call" }); return []; }
+    return [{ gameId: g.id, sport: sp, mkt: m, home: g.homeTeam.name, away: g.awayTeam.name, start: g.startUtc, label: l.label }];
+  });
+  const r = await sportybetBook(bookable, dropped);
   const note = r.unbookable.length ? `Not booked: ${r.unbookable.map((u) => `${u.label} (${u.reason})`).join("; ")}` : null;
   return { ...r, note };
 }

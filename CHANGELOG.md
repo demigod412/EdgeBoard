@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.11.0 — Sportybet booking codes actually work
+- **Fix: booking has never produced a code on any sport, because `marketId` was missing.** Sportybet's
+  `pcUpcomingEvents` **requires** it. Omitting it does not mean "all markets" — the endpoint answers
+  `bizCode 19000 "Invalid"` and the request fails outright. Every attempt therefore threw
+  `Sportybet returned code 19000`, and the catch block blamed geo-blocking, which sent the search in
+  entirely the wrong direction. The football app has always sent `marketId`, which is why it worked and
+  this did not. Verified directly against the live endpoint: identical request, with and without.
+- **Markets and outcomes are matched by id now, not by description text**, and every id was read off the
+  live endpoint rather than assumed. The old description matching could not have worked either:
+  basketball's plain `1X2` is a **three-way, regular-time** market, so it failed both the
+  `winner|moneyline|home/away` wording test and the "exactly two outcomes" test. A moneyline that
+  includes overtime comes from a different market entirely.
+    · basketball — 219 winner (incl. OT), 225 total, 223 handicap, 227 team total, 68 1st-half total
+    · baseball — 251 winner (incl. extra innings), 258 total, 256 handicap, 260/261 team totals
+    · hockey — 406 winner (incl. OT and penalties), 412 total, 410 handicap, 446 1st-period total,
+      1 regulation 1X2, 29 GG/NG
+- **Team totals now pick the right team.** Basketball serves both teams from one market id and names the
+  team in the description; baseball uses a separate id per team. Both are handled.
+- **Regulation three-way and both-teams-to-score are bookable for hockey**, which they were not before.
+- **Fix: a leg that could not be resolved locally vanished.** If a market was no longer on the latest
+  call, or the game had started, the leg was dropped from the request and never reached the "not booked"
+  list — so a slip came back short with nothing saying why. Each one is now reported with its reason,
+  which is what the module always claimed to do.
+- Unsupported markets say which kind was refused instead of a flat "market not supported".
+
 ## 0.10.5 — fixtures the season lists leave out
 - **Fix: the sync only ever asked for whole seasons, so fixtures API-Sports omits from a season list were
   invisible.** `/games?league&season` and `/games?date` are served from the same data but do not always

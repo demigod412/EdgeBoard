@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.5 — fixtures the season lists leave out
+- **Fix: the sync only ever asked for whole seasons, so fixtures API-Sports omits from a season list were
+  invisible.** `/games?league&season` and `/games?date` are served from the same data but do not always
+  agree: a play-off bracket seeded the day a regular season ends appears on the date endpoint while the
+  season list still reports nothing upcoming. That is exactly the WNBA — `345 games, 0 upcoming` with its
+  quarter-finals two days away, and its results visibly arriving through the date endpoint all along.
+  PitchEdge has always asked for the upcoming window explicitly, with a comment saying why; this sport
+  never did.
+- The sync now sweeps the next **8 days** (`UPCOMING_DAYS`, max 21) on the date endpoint before walking
+  the leagues, and merges anything a league's season list did not return. **One request per date covers
+  every league at once**, so the sweep costs 8 requests a sync rather than one per league per day, and
+  the games arrive in time for the same run to predict them. A league whose season list comes back empty
+  but which has dated fixtures is now created rather than skipped.
+- The report gains an `upcomingSweep` line (days swept, games seen, leagues touched).
+- **`npm run sourcecheck -- --date 2026-09-27`** lists what the date endpoint returns for one day,
+  grouped by league. When the two endpoints disagree, this is how you see it.
+
 ## 0.10.4 — the sync report says how many games are stored ahead
 - Each league line now carries **`upcoming`** alongside `games` and `predictions`. `games` has always
   been the *finished* history used to fit the model, so a line reading `345 games, 0 predictions` could

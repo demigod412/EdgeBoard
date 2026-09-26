@@ -25,10 +25,44 @@ export async function ingest(db: PrismaClient, p: SportProvider, opts: { now?: D
       const k = leagueLabel(L);
       return labelCount.get(k)! > 1 ? `${k} #${L.id}` : k;
     };
+    /*
+     * Fixtures the season lists leave out.
+     *
+     * API-Sports serves /games?league&season and /games?date from the same data but not always with
+     * the same contents: a play-off bracket seeded the day the regular season ends appears on the date
+     * endpoint while the season list still shows nothing upcoming. The WNBA sat at "345 games, 0
+     * upcoming" for exactly that reason while its quarter-finals were two days away. PitchEdge has
+     * always asked for the upcoming window explicitly for this reason; this sport never did.
+     *
+     * One request per date covers every league at once, so the whole sweep costs UPCOMING_DAYS requests
+     * rather than one per league per day.
+     */
+    const UPCOMING_DAYS = Math.min(21, Math.max(0, Number(process.env.UPCOMING_DAYS) || 8));
+    const swept = new Map<string, PGame[]>();
+    let sweptDays = 0, sweptGames = 0;
+    for (let i = 0; i < UPCOMING_DAYS; i++) {
+      const d = new Date(now.getTime() + i * 86_400_000).toISOString().slice(0, 10);
+      try {
+        const gs = await p.gamesOn(d);
+        sweptDays++;
+        for (const g of gs) {
+          const k = String(g.leagueExternalId);
+          swept.set(k, [...(swept.get(k) ?? []), g]);
+          sweptGames++;
+        }
+      } catch { /* one unavailable date must not stop the sync */ }
+      await sleep(250);
+    }
+    report.upcomingSweep = { days: sweptDays, games: sweptGames, leagues: swept.size };
+
     for (const L of leagues) {
       const season = L.season ?? p.season(now);
       let games: PGame[] = [];
       try { games = await p.seasonGames(L.id, season); } catch (e) { report[label(L)] = `skip: ${(e as Error).message}`; continue; }
+      // Anything the date sweep found for this league that the season list did not return.
+      const seasonIds = new Set(games.map((g) => g.externalId));
+      const extra = (swept.get(L.id) ?? []).filter((g) => !seasonIds.has(g.externalId));
+      if (extra.length) games = [...games, ...extra];
       if (games.filter((g) => g.status === "FINISHED").length < 150) {
         try { games = [...(await p.seasonGames(L.id, L.prevSeason ?? p.prevSeason(season))), ...games]; } catch (e) { report[`${label(L)} previous season`] = `not loaded: ${(e as Error).message}`; }
       }

@@ -3,6 +3,7 @@
  *   cd /var/www/edgearena && sudo -u ubuntu npm run sourcecheck
  *   cd /var/www/edgearena && sudo -u ubuntu npm run sourcecheck -- --all
  *   cd /var/www/edgearena && sudo -u ubuntu npm run sourcecheck -- --find wnba
+ *   cd /var/www/edgearena && sudo -u ubuntu npm run sourcecheck -- --date 2026-09-27
  *
  * Leagues are matched by country + name, so a competition the provider spells differently is
  * skipped silently rather than reported as an error. `--all` lists everything your plan returns
@@ -18,6 +19,8 @@ const argv = process.argv.slice(2);
 const showAll = argv.includes("--all");
 const findAt = argv.indexOf("--find");
 const needle = findAt >= 0 ? (argv[findAt + 1] ?? "").toLowerCase() : "";
+const dateAt = argv.indexOf("--date");
+const onDate = dateAt >= 0 ? (argv[dateAt + 1] ?? "") : "";
 
 (async () => {
   for (const s of SPORT_IDS) {
@@ -74,6 +77,22 @@ const needle = findAt >= 0 ? (argv[findAt + 1] ?? "").toLowerCase() : "";
       } catch (e) { console.log(`   raw league lookup failed: ${(e as Error).message}`); }
     } else if ((showAll || needle) && !p.rawLeagues) {
       console.log(`   (--all / --find only work on API-Sports; this source has a fixed league list)`);
+    }
+
+    // What the DATE endpoint returns for one day, grouped by league. The season endpoint and the date
+    // endpoint do not always agree -- a play-off bracket seeded after the regular season shows up on the
+    // date endpoint while the season list still reports nothing upcoming -- so this is how you tell.
+    if (onDate) {
+      try {
+        const gs = await p.gamesOn(onDate);
+        console.log(`   --date ${onDate}: ${gs.length} game(s) from the date endpoint`);
+        const byLeague = new Map<string, typeof gs>();
+        for (const g of gs) byLeague.set(String(g.leagueExternalId), [...(byLeague.get(String(g.leagueExternalId)) ?? []), g]);
+        for (const [lid, rows] of [...byLeague.entries()].sort((a, b) => b[1].length - a[1].length)) {
+          console.log(`   · league id ${lid}: ${rows.length} game(s) — ${rows.slice(0, 3).map((g) => `${g.away.name} at ${g.home.name} (${g.status})`).join("; ")}`);
+        }
+        if (!gs.length) console.log(`   · nothing scheduled on that date for ${s}`);
+      } catch (e) { console.log(`   --date ${onDate} failed: ${(e as Error).message}`); }
     }
 
     try {

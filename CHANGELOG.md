@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.10.3 — a competition whose season has ended is reachable again
+- **Fix: picking the WNBA (or any finished season) showed an empty board with nothing to click.** The
+  "no games on this date" helper only ever looked **forward** for the next game day, so a competition
+  with nothing ahead produced no suggestion at all — and 0.10.0 made **Upcoming** the default tab, which
+  a finished season can never fill. `NBA W` has 345 stored games and not one in the future, so choosing
+  it looked like the app was broken. Introduced by 0.10.0; the forward-only lookup predates it.
+- The board now finds the nearest day with games **in either direction**: ahead if there is anything
+  ahead, otherwise the most recent day played. Jumping backwards also switches to the **Finished** tab,
+  because every game on a past day is finished and landing on an empty Upcoming tab would be the same
+  dead end one date further on.
+- **The league filter now takes you somewhere with games.** A competition still playing keeps the
+  selected date, as before; one whose season is over jumps straight to its own last game day on the
+  Finished tab. So the WNBA opens on its most recent games in one click rather than none.
+- **Competitions between seasons are labelled `· ended` in the filter**, so a quiet board reads as a
+  finished season rather than a fault. Two grouped queries for the whole sport, not one per league.
+- The empty state says which case you are in: next games on a date, or a season that looks finished with
+  the date of its last games.
+
 ## 0.10.2 — markets earn their place; a loading bar
 - **Legs are now weighted by how well each market has actually delivered.** `Candidate.trust` existed,
   was used in the ranking and was **never once set** — always 1, so the field did nothing. The ledger

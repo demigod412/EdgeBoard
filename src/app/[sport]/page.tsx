@@ -38,13 +38,51 @@ export default async function Board({ params, searchParams }: { params: Promise<
     inView.forEach((g) => { const p = g.predictions[0]; if (!p) return; const k = picksOf(p); focus.set(g.id, view === "win" ? k.win : view === "total" ? k.total : view === "spread" ? k.spread : k.seg); });
     shown = [...inView].sort((a, b) => (focus.get(b.id)?.p ?? 0) - (focus.get(a.id)?.p ?? 0));
   }
-  const nextDay = games.length ? null : await (async () => {
-    const { source } = await dataMode(sport);
-    const g = await prisma.game.findFirst({ where: { sport: SPORT_ENUM[sport], source, startUtc: { gte: new Date(from.getTime() + 86_400_000) }, ...(sp.league ? { leagueId: sp.league } : {}) }, orderBy: { startUtc: "asc" }, select: { startUtc: true } });
-    return g ? dayKey(g.startUtc) : null;
+  /*
+   * Nearest day that actually has games for this filter, looking forward first and then back.
+   *
+   * Looking only forward stranded any competition whose season has ended: the WNBA has 345 stored
+   * games and not one in the future, so the board showed "no games" with nothing to click. Jumping
+   * backwards also switches the tab to Finished, because every game on a past day is finished and
+   * landing on an empty Upcoming tab would be the same dead end one date further on.
+   */
+  const { source: src } = await dataMode(sport);
+  const nearest = games.length ? null : await (async () => {
+    const where = { sport: SPORT_ENUM[sport], source: src, ...(sp.league ? { leagueId: sp.league } : {}) };
+    const ahead = await prisma.game.findFirst({
+      where: { ...where, startUtc: { gte: new Date(from.getTime() + 86_400_000) } },
+      orderBy: { startUtc: "asc" }, select: { startUtc: true },
+    });
+    if (ahead) return { day: dayKey(ahead.startUtc), dir: "next" as const };
+    const behind = await prisma.game.findFirst({
+      where: { ...where, startUtc: { lt: from } },
+      orderBy: { startUtc: "desc" }, select: { startUtc: true },
+    });
+    return behind ? { day: dayKey(behind.startUtc), dir: "prev" as const } : null;
   })();
+  const jump = nearest
+    ? { href: `/${sport}?date=${nearest.day}${sp.league ? `&league=${sp.league}` : ""}${nearest.dir === "prev" ? "&show=finished" : ""}`,
+        label: nearest.dir === "next" ? "Go to next game day" : "Go to the last game day" }
+    : undefined;
   const q = (o: Record<string, string | undefined>) => "?" + new URLSearchParams(Object.entries({ date, league: sp.league, view, show, ...o })
     .filter(([k, v]) => v && v !== "best" && !(k === "show" && v === "upcoming")) as [string, string][]).toString();
+  /*
+   * Which leagues still have games ahead, and when each last played. Two grouped queries for the whole
+   * sport rather than one per league. Without this, choosing a competition whose season has ended kept
+   * today's date and showed an empty board — the WNBA has 345 stored games and looked broken.
+   */
+  const [aheadRows, behindRows] = await Promise.all([
+    prisma.game.groupBy({ by: ["leagueId"], where: { sport: SPORT_ENUM[sport], source: src, startUtc: { gte: now } }, _count: { _all: true } }),
+    prisma.game.groupBy({ by: ["leagueId"], where: { sport: SPORT_ENUM[sport], source: src, startUtc: { lt: now } }, _max: { startUtc: true } }),
+  ]);
+  const hasAhead = new Set(aheadRows.map((r) => r.leagueId));
+  const lastPlayed = new Map(behindRows.flatMap((r) => (r._max.startUtc ? [[r.leagueId, r._max.startUtc] as const] : [])));
+  /** Where picking this league should take you: its own last game day once its season is over. */
+  const leagueHref = (id: string) => {
+    if (hasAhead.has(id)) return q({ league: id });                    // still playing: keep the date
+    const last = lastPlayed.get(id);
+    return last ? q({ league: id, date: dayKey(last), show: "finished" }) : q({ league: id });
+  };
 
   return (
     <PullToRefresh>
@@ -73,7 +111,12 @@ export default async function Board({ params, searchParams }: { params: Promise<
         <div data-no-ptr className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
           <FilterSelect label="League" value={sp.league ?? "all"}
             options={[{ value: "all", label: `All leagues (${leagues.length})`, href: q({ league: undefined }) },
-              ...leagues.map((l) => ({ value: l.id, label: leagueLabel(l), href: q({ league: l.id }) }))]} />
+              ...leagues.map((l) => ({
+                value: l.id,
+                // Marked so a competition between seasons is obviously that, not obviously broken.
+                label: hasAhead.has(l.id) ? leagueLabel(l) : `${leagueLabel(l)} · ended`,
+                href: leagueHref(l.id),
+              }))]} />
         </div>
       )}
       <div data-no-ptr className="mb-5 flex gap-1.5 overflow-x-auto pb-1">
@@ -85,8 +128,11 @@ export default async function Board({ params, searchParams }: { params: Promise<
           ? <EmptyState title={`No ${VIEW_LABEL[show].toLowerCase()} ${cfg.name.toLowerCase()} games on this date`}
               body={`This date has ${GAME_VIEWS.filter((v) => counts[v] > 0).map((v) => `${counts[v]} ${VIEW_LABEL[v].toLowerCase()}`).join(" and ") || "nothing playable"}.`}
               action={(() => { const other = GAME_VIEWS.find((v) => v !== show && counts[v] > 0); return other ? { href: q({ show: other }), label: `Show ${VIEW_LABEL[other].toLowerCase()}` } : undefined; })()} />
-          : <EmptyState title="No games on this date" body={nextDay ? `Next ${cfg.name.toLowerCase()} games: ${fmtWat(watDayStart(nextDay), "EEEE d MMMM")}.` : `No upcoming ${cfg.name.toLowerCase()} games are stored. The league may be in its off-season.`}
-              action={nextDay ? { href: `/${sport}?date=${nextDay}${sp.league ? `&league=${sp.league}` : ""}`, label: "Go to next game day" } : undefined} />}
+          : <EmptyState title="No games on this date"
+              body={nearest?.dir === "next" ? `Next ${cfg.name.toLowerCase()} games: ${fmtWat(watDayStart(nearest.day), "EEEE d MMMM")}.`
+                : nearest?.dir === "prev" ? `Nothing scheduled ahead for this selection — its season looks finished. The last games were on ${fmtWat(watDayStart(nearest.day), "EEEE d MMMM")}.`
+                : `No ${cfg.name.toLowerCase()} games are stored for this selection yet. They appear after the next sync.`}
+              action={jump} />}
     </PullToRefresh>
   );
 }

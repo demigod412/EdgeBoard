@@ -68,5 +68,8 @@ export async function rateAndPredictLeague(db: PrismaClient, sport: SportId, lea
   const upcoming = await db.game.findMany({ where: { leagueId, status: "SCHEDULED", startUtc: { gt: new Date(now.getTime() + LOCK_MIN * 60_000), lte: new Date(now.getTime() + 8 * DAY) } }, include: { homeTeam: true, awayTeam: true } });
   let written = 0;
   for (const g of upcoming) if (await writePrediction(db, sport, g, fit, hist, { now, newsComplete: opts.newsComplete?.(g) ?? false, cal, residual, strongFloor: opts.strongFloor ?? 0.65 })) written++;
-  return { games: hist.length, predictions: written };
+  // `games` is FINISHED history used for the fit; `upcoming` is what is stored ahead. Reporting only
+  // the first two made "no fixtures from the provider" indistinguishable from "stored but not
+  // predicted", which cost a round of guessing on the WNBA playoffs.
+  return { games: hist.length, upcoming: upcoming.length, predictions: written };
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.4 — the sync report says how many games are stored ahead
+- Each league line now carries **`upcoming`** alongside `games` and `predictions`. `games` has always
+  been the *finished* history used to fit the model, so a line reading `345 games, 0 predictions` could
+  not distinguish "the provider sent no fixtures" from "fixtures are stored but nothing was predicted" —
+  which cost a round of guessing on the WNBA playoffs. The three numbers now separate provider coverage,
+  storage and prediction.
+
 ## 0.10.3 — a competition whose season has ended is reachable again
 - **Fix: picking the WNBA (or any finished season) showed an empty board with nothing to click.** The
   "no games on this date" helper only ever looked **forward** for the next game day, so a competition

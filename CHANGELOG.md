@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.10.1 — the builder was choosing the LEAST likely legs; even leg prices
+- **Fix: "Safest" systematically preferred the less likely of two equally priced legs.** The candidate
+  ranking divided log(p) by *minus* the price, which inverts it: both terms are negative, so the score
+  fell as probability rose. Worse, equally priced candidates share a price bucket and only one survives
+  the pool cut, so the better leg was thrown away before the search ever saw it. Given a choice between
+  p=0.82 and p=0.66 at the same 1.30, the builder returned five legs of 0.66 — a **12.5%** slip where
+  **37.1%** was available on the same games at the same price. It now divides by the price, so the
+  metric rises with probability. Tested both directions.
+  (Reaching a target is a knapsack: maximise the sum of log(p) subject to the sum of log(odds) clearing
+  log(target), which makes log(p) per unit of log(odds) the right greedy ratio. With fair odds it is
+  −1 for every leg — correct, not broken: every leg is then equally efficient and the target alone
+  sets the chance.)
+- **Legs are now kept to a similar price.** 19.00 over 12 legs gives twelve legs of 19^(1/12) = **1.28
+  each**, not a 1.60 beside a 1.03. Evenness is measured on each leg's share of the price rather than
+  on the odds: at a 1.28 ideal, a "within 25%" band on the odds runs from 1.02 to 1.60 and lets a 1.03
+  through, though it carries 0.03 of the price where an equal share is 0.25.
+- **New controls: Min legs and Leg prices (Even / Any mix).** A minimum leg count spreads the same
+  price over more, shorter picks; Even is the default. Min legs offers every step up to whatever Max
+  legs is set to, so a 12-leg target is actually reachable.
+- Each combination shows **legs average** and, where they differ, the **range**.
+- Also: partial slips already at the leg limit are no longer carried forward in the search, since they
+  can never be extended.
+
 ## 0.10.0 — Upcoming / Live / Finished on every board
 - **Three tabs on each sport's board**, with a count on each: **Upcoming** (not started — the default,
   since the board's job is the games you can still bet on), **Live** (being played now, with a pulsing

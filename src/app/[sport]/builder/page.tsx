@@ -22,17 +22,22 @@ const WINDOWS: [number, string][] = [[1, "Today"], [2, "Next 2 days"], [3, "Next
 
 export default async function Builder({ params, searchParams }: {
   params: Promise<{ sport: SportId }>;
-  searchParams: Promise<{ target?: string; days?: string; mode?: string; legs?: string; scope?: string }>;
+  searchParams: Promise<{ target?: string; days?: string; mode?: string; legs?: string; scope?: string; min?: string; even?: string }>;
 }) {
   const { sport } = await params; const sp = await searchParams;
   const target = Math.min(1000, Math.max(1.2, Number(sp.target) || 5));
   const days = WINDOWS.some(([d]) => d === Number(sp.days)) ? Number(sp.days) : 2;
   const mode: "value" | "safe" = sp.mode === "safe" ? "safe" : "value";
   const maxLegs = Math.min(15, Math.max(2, Number(sp.legs) || 12));
+  const minLegs = Math.min(maxLegs, Math.max(1, Number(sp.min) || 1));
+  // Even legs by default: a twelve-fold is meant to be twelve similar prices, not one long leg
+  // propped up by eleven near-certainties. "even=0" opts out.
+  const evenLegs = sp.even !== "0";
   const all = sp.scope === "all";
   const sports = all ? SPORT_IDS : [sport];
-  const href = (o: Partial<{ target: number; days: number; mode: string; legs: number; scope: string | null }>) => {
-    const q = new URLSearchParams({ target: String(o.target ?? target), days: String(o.days ?? days), mode: o.mode ?? mode, legs: String(o.legs ?? maxLegs) });
+  const href = (o: Partial<{ target: number; days: number; mode: string; legs: number; min: number; even: boolean; scope: string | null }>) => {
+    const q = new URLSearchParams({ target: String(o.target ?? target), days: String(o.days ?? days), mode: o.mode ?? mode,
+      legs: String(o.legs ?? maxLegs), min: String(o.min ?? minLegs), even: (o.even ?? evenLegs) ? "1" : "0" });
     const sc = o.scope === null ? undefined : o.scope ?? (all ? "all" : undefined); if (sc) q.set("scope", sc);
     return `/${sport}/builder?${q}`;
   };
@@ -61,7 +66,7 @@ export default async function Builder({ params, searchParams }: {
   // Only when Safest was actually chosen: with no stored odds the toggle is hidden and the search
   // already runs in safe mode, so capping there would silently change that view.
   const legCap = mode === "safe" ? SAFE_MAX_LEG_ODDS : undefined;
-  const slips = buildSlips(candidates, { target, maxLegs, mode: withOdds ? mode : "safe", band: "LOW", maxLegOdds: legCap }, 3);
+  const slips = buildSlips(candidates, { target, maxLegs, minLegs, mode: withOdds ? mode : "safe", band: "LOW", maxLegOdds: legCap, evenLegs }, 3);
   const hint = legHint(target);
   const sportOf = (e: string) => SPORT_IDS.find((s) => SPORT_ENUM[s] === e)!;
 
@@ -77,7 +82,7 @@ export default async function Builder({ params, searchParams }: {
     const cands: Candidate[] = ps.flatMap((x) => marketsOf(x).map((m) => ({
       matchId: x.gameId, league: leagueLabel(x.game.league), startMs: +x.game.startUtc, match: `${x.game.awayTeam.name} at ${x.game.homeTeam.name}`,
       label: m.label, market: m.key, group: m.group, p: m.p, odds: 1 / m.p, real: false, band: x.band })));
-    const [built] = buildSlips(cands, { target, maxLegs, mode: "safe", band: "LOW", maxLegOdds: legCap }, 1);
+    const [built] = buildSlips(cands, { target, maxLegs, minLegs, mode: "safe", band: "LOW", maxLegOdds: legCap, evenLegs }, 1);
     if (!built) return [];
     const legs = built.legs.map((l) => {
       const x = ps.find((q) => q.gameId === l.matchId)!, r = x.game.results[0];
@@ -98,6 +103,9 @@ export default async function Builder({ params, searchParams }: {
           one leg per game, at most 2 per competition and 2 of the same market type.
           {withOdds ? " Bookmaker prices are used where they exist, so value legs are preferred." : " No bookmaker prices are stored for these games, so the model's fair odds are used: the target itself sets the chance."}
           {legCap ? ` Safest never uses a leg priced above ${legCap.toFixed(2)}, so the target is reached with more, shorter picks.` : ""}
+          {evenLegs
+            ? ` Even legs is on: legs are kept to a similar price — ${target.toFixed(2)} over ${Math.max(2, minLegs > 1 ? minLegs : legHint(target).min)} legs means about ${Math.pow(target, 1 / Math.max(2, minLegs > 1 ? minLegs : legHint(target).min)).toFixed(2)} each.`
+            : " Even legs is off: legs may be any mix of prices that reaches the target."}
         </p>
       </header>
 
@@ -116,6 +124,10 @@ export default async function Builder({ params, searchParams }: {
         </form>
         <FilterSelect label="Window" value={String(days)} options={WINDOWS.map(([d, l]) => ({ value: String(d), label: l, href: href({ days: d }) }))} />
         <FilterSelect label="Max legs" value={String(maxLegs)} options={[4, 6, 8, 10, 12, 15].map((n) => ({ value: String(n), label: `${n} legs`, href: href({ legs: n }) }))} />
+        <FilterSelect label="Min legs" value={String(minLegs)}
+          options={[1, 3, 4, 5, 6, 8, 10, 12, 15].filter((n) => n <= maxLegs).map((n) => ({ value: String(n), label: n === 1 ? "no minimum" : `at least ${n}`, href: href({ min: n }) }))} />
+        <FilterSelect label="Leg prices" value={evenLegs ? "even" : "mixed"}
+          options={[{ value: "even", label: "Even", href: href({ even: true }) }, { value: "mixed", label: "Any mix", href: href({ even: false }) }]} />
       </div>
       <div data-no-ptr className="mb-5 flex flex-wrap items-center gap-1.5">
         <Link href={href({ scope: null })}><Chip active={!all}>{SPORTS[sport].name} only</Chip></Link>

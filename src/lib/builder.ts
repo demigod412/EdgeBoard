@@ -7,6 +7,7 @@
  *   spread   — one leg per match, at most 2 per competition and 2 of the same market type
  *   leg cap  — "safe" mode refuses any leg priced above SAFE_MAX_LEG_ODDS, so a long target is
  *              reached with many short picks rather than a few risky ones
+ *   even     — legs of similar price rather than one long leg carried by near-certainties
  *   honesty  — with fair odds the target decides the chance (3.0 ⇒ ~33%); the search decides HOW you get there
  */
 export interface Candidate {
@@ -19,10 +20,22 @@ export interface BuildOptions {
   maxPerLeague?: number; maxPerGroup?: number; band?: string; overshoot?: number;
   /** Hard ceiling on any single leg's price. Never relaxed, even when the target becomes unreachable. */
   maxLegOdds?: number;
+  /** Smallest number of legs to accept: spreads the same price over more, shorter picks. */
+  minLegs?: number;
+  /**
+   * Prefer legs of similar price. 19.00 over 12 legs ideally means twelve legs of 19^(1/12) = 1.28,
+   * not a 1.60 beside a 1.03. Relaxed through the attempt ladder when a tight band cannot reach.
+   */
+  evenLegs?: boolean;
 }
-export interface BuiltSlip { legs: Candidate[]; odds: number; p: number; adjusted: number; edge: number; real: boolean; short?: boolean; relaxed?: boolean }
+export interface BuiltSlip {
+  legs: Candidate[]; odds: number; p: number; adjusted: number; edge: number; real: boolean;
+  short?: boolean; relaxed?: boolean;
+  /** Longest leg ÷ shortest leg. 1 is perfectly even; the page shows it so the mix is visible. */
+  spread: number;
+}
 
-export const DEFAULTS = { maxLegs: 12, minP: 0.5, maxPerLeague: 2, maxPerGroup: 2, overshoot: 1.35 };
+export const DEFAULTS = { maxLegs: 12, minLegs: 1, minP: 0.5, maxPerLeague: 2, maxPerGroup: 2, overshoot: 1.35 };
 /**
  * Safest mode: no leg priced above this. 1.60 is roughly a 62% chance, so every pick in the slip
  * is one the model rates a clear favourite — the point of the tab. A target that cannot be reached
@@ -33,7 +46,27 @@ export const SAFE_MAX_LEG_ODDS = 1.6;
  * If nothing lands in the band, try again with a wider band and, after that, with the spread rules relaxed
  * (few leagues on a quiet day can make "max 2 per competition" impossible for a long target).
  */
-const ATTEMPTS = [{ widen: 1, extra: 0 }, { widen: 1.6, extra: 0 }, { widen: 2.5, extra: 1 }, { widen: 4, extra: 2 }, { widen: 6, extra: 4 }];
+const ATTEMPTS = [
+  { widen: 1, extra: 0, even: 1.5 },
+  { widen: 1.6, extra: 0, even: 2 },
+  { widen: 2.5, extra: 1, even: 3 },
+  { widen: 4, extra: 2, even: Infinity },
+  { widen: 6, extra: 4, even: Infinity },
+];
+
+/**
+ * How evenly a slip's legs are priced, as the ratio between the largest and smallest share of the
+ * total price. Measured on log odds, not odds: a 1.03 leg carries 0.03 of price where an equal share
+ * of a 19.00 target over 12 legs is 0.25, so it is plainly out of place — while a naive "within 25%"
+ * band on the odds themselves would run from 0.96 to 1.50 and wave it through.
+ */
+export const legEvenness = (odds: number[], target: number) => {
+  if (odds.length < 2) return 1;
+  const ideal = Math.log(Math.max(1.0001, target)) / odds.length;
+  if (ideal <= 0) return 1;
+  const ratios = odds.map((o) => Math.log(Math.max(1.0001, o)) / ideal);
+  return Math.max(...ratios) / Math.min(...ratios);
+};
 /** Legs are not independent (same day, same competition, similar weather/market drivers): a small haircut per extra leg. */
 export const adjust = (p: number, legs: number) => p * 0.98 ** Math.max(0, legs - 1);
 export const oneInN = (p: number) => (p > 0 ? Math.round(1 / p) : Infinity);
@@ -46,25 +79,49 @@ const key = (legs: Candidate[]) => legs.map((l) => `${l.matchId}:${l.market}`).s
  */
 export function buildSlips(all: Candidate[], o: BuildOptions, want = 3): BuiltSlip[] {
   for (const a of ATTEMPTS) {
-    const found = search(all, o, want, a.widen, a.extra);
+    const found = search(all, o, want, a.widen, a.extra, a.even);
     if (found.length) return found.map((s) => (a.extra ? { ...s, relaxed: true } : s));
   }
   return [];
 }
 
-function search(all: Candidate[], o: BuildOptions, want: number, widen: number, extra = 0): BuiltSlip[] {
+function search(all: Candidate[], o: BuildOptions, want: number, widen: number, extra = 0, evenTol = Infinity): BuiltSlip[] {
   const base = { ...DEFAULTS, ...o };
   const cfg = { ...base, maxPerLeague: base.maxPerLeague + extra, maxPerGroup: base.maxPerGroup + extra };
   const target = Math.max(1.01, o.target), ceiling = target * (1 + (cfg.overshoot - 1) * widen);
+  /*
+   * Even legs: restrict the pool to prices that could make up an equal share of the target. The leg
+   * count aimed at is the minimum asked for, or the natural count for the target. Working in log odds
+   * keeps "an equal share of the price" the thing bounded.
+   */
+  const aimLegs = Math.max(2, Math.min(cfg.maxLegs, cfg.minLegs > 1 ? cfg.minLegs : legHint(target).min));
+  const idealLog = Math.log(target) / aimLegs;
+  const evenBand = cfg.evenLegs && Number.isFinite(evenTol) && idealLog > 0
+    ? { lo: Math.exp(idealLog / evenTol), hi: Math.exp(idealLog * evenTol) }
+    : null;
   const pool = all.filter((c) => c.p >= cfg.minP && c.odds > 1.01 && (!o.band || c.band !== "LOW")
-      && (!cfg.maxLegOdds || c.odds <= cfg.maxLegOdds + 1e-9))
+      && (!cfg.maxLegOdds || c.odds <= cfg.maxLegOdds + 1e-9)
+      && (!evenBand || (c.odds >= evenBand.lo - 1e-9 && c.odds <= evenBand.hi + 1e-9)))
     .map((c) => ({ ...c, trust: c.trust ?? 1 }));
   if (!pool.length) return [];
-  // Rank: value mode prefers edge per unit of price; safe mode prefers reliable probability per unit of price.
+  /*
+   * Rank: value mode prefers edge per unit of price; safe mode prefers probability per unit of price.
+   *
+   * Safe mode is log(p) / log(odds) — both the numerator and the price are what they are, and dividing
+   * by +price makes the metric rise with p, which is the point. It was previously divided by -price,
+   * which inverted it: given two legs at the same odds the search kept the LESS likely one, and since
+   * same-priced candidates share a price bucket the better leg was dropped before the search saw it.
+   * Offered p=0.82 and p=0.66 at 1.30, it built a 12.5% slip where 37.1% was available.
+   *
+   * Reaching a target is a knapsack: maximise the sum of log(p) subject to the sum of log(odds) clearing
+   * log(target), so log(p) per unit of log(odds) is the right greedy ratio. With fair odds (no bookmaker
+   * price) it is -1 for every leg, which is correct rather than broken — every leg is then equally
+   * efficient and the target alone sets the chance.
+   */
   const rank = (c: Candidate) => {
     const price = Math.log(c.odds);
     if (price <= 0) return -Infinity;
-    return cfg.mode === "value" && c.real ? (c.p * c.odds - 1) / price : Math.log(c.p * (c.trust ?? 1)) / -price;
+    return cfg.mode === "value" && c.real ? (c.p * c.odds - 1) / price : Math.log(c.p * (c.trust ?? 1)) / price;
   };
   // Build a pool that is spread across BOTH matches and price levels. Taking a plain "top N" would fill up with
   // many markets from the same few matches, and the search would run out of matches long before it reached a long target.
@@ -89,14 +146,18 @@ function search(all: Candidate[], o: BuildOptions, want: number, widen: number, 
         const logOdds = st.logOdds + Math.log(c.odds);
         if (logOdds > Math.log(ceiling)) continue;                 // never overshoot the target band
         const legs = [...st.legs, c], logP = st.logP + Math.log(c.p);
-        if (logOdds >= Math.log(target)) {
+        // A minimum leg count spreads the same price over more, shorter-priced legs.
+        if (logOdds >= Math.log(target) && legs.length >= (cfg.minLegs ?? 1)) {
           const p = Math.exp(logP), odds = Math.exp(logOdds);
           const real = legs.every((l) => l.real);
-          const slip: BuiltSlip = { legs, odds, p, adjusted: adjust(p, legs.length), edge: p * odds - 1, real };
+          const prices = legs.map((x) => x.odds);
+          const slip: BuiltSlip = { legs, odds, p, adjusted: adjust(p, legs.length), edge: p * odds - 1, real,
+            spread: Math.max(...prices) / Math.min(...prices) };
           const k = key(legs);
           if (!done.has(k) || done.get(k)!.p < p) done.set(k, slip);
           continue;                                                 // target reached: don't extend further
         }
+        if (legs.length >= cfg.maxLegs) continue;
         next.push({ legs, logOdds, logP, matches: new Set([...st.matches, c.matchId]),
           leagues: new Map(st.leagues).set(c.league, (st.leagues.get(c.league) ?? 0) + 1),
           groups: new Map(st.groups).set(c.group, (st.groups.get(c.group) ?? 0) + 1) });
@@ -114,7 +175,10 @@ function search(all: Candidate[], o: BuildOptions, want: number, widen: number, 
     }
     beam = [...buckets.values()].flat().slice(0, 600);
   }
-  const out = [...done.values()].sort((a, b) => (cfg.mode === "value" && a.real && b.real ? b.edge - a.edge : b.p - a.p));
+  const out = [...done.values()].sort((a, b) =>
+    (cfg.mode === "value" && a.real && b.real ? b.edge - a.edge : b.p - a.p)
+    // Chance is largely fixed by the price aimed at, so evenness is the useful tiebreak.
+    || (cfg.evenLegs ? a.spread - b.spread : 0));
   // Alternatives should look different: at most half the legs shared with a slip already chosen.
   const picked: BuiltSlip[] = [];
   for (const s of out) {

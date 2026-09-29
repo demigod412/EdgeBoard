@@ -109,6 +109,12 @@ if [[ "$MODE" == "update" ]]; then
     systemctl daemon-reload
     ok "Added a ${HEAP_MB:-384}MB heap ceiling to $APP_NAME.service"
   fi
+  # Same for the cgroup limit. Also idempotent, so a hand-tuned value survives updates.
+  if [[ -f "$UNIT_FILE" ]] && ! grep -q "MemoryMax" "$UNIT_FILE"; then
+    sed -i "/^Restart=always\$/i MemoryMax=${MEM_MAX:-550M}" "$UNIT_FILE"
+    systemctl daemon-reload
+    ok "Confined $APP_NAME.service to ${MEM_MAX:-550M}"
+  fi
   systemctl restart "$APP_NAME"
   # Refresh scheduled jobs from vercel.json (new jobs such as lock/results appear automatically)
   CRON_SECRET=$(grep -E '^CRON_SECRET=' "$APP_DIR/.env" | head -1 | cut -d= -f2-)
@@ -323,7 +329,18 @@ ok "Build complete"
 # starts logging heap-allocation failures -- an error on one page is a far better outcome than an OOM
 # kill that takes the whole machine with it, but it still wants looking at.
 HEAP_MB=${HEAP_MB:-384}
-say "Creating systemd service '$APP_NAME' (heap ceiling ${HEAP_MB}MB)"
+#
+# The heap ceiling above stops THIS app running away. MemoryMax stops it taking the machine with it.
+#
+# Without a cgroup limit a shortage is machine-wide, and the kernel then picks a victim globally -- which
+# is how one app ballooning killed a sibling and left the box needing a reboot. With MemoryMax the kernel
+# reclaims and, if it must, kills inside this service's own cgroup: the other apps never notice, and
+# Restart=always brings this one back in seconds. A self-healing failure instead of an outage.
+#
+# Set above the heap ceiling, not equal to it: a Node process's resident size includes code, buffers and
+# the young generation on top of old space, so a $HEAP_MB heap sits comfortably inside this.
+MEM_MAX=${MEM_MAX:-550M}
+say "Creating systemd service '$APP_NAME' (heap ${HEAP_MB}MB, confined to ${MEM_MAX})"
 cat > "/etc/systemd/system/$APP_NAME.service" <<UNIT
 [Unit]
 Description=$APP_NAME (Next.js)
@@ -340,6 +357,7 @@ Environment=PORT=$PORT
 Environment=HOSTNAME=127.0.0.1
 Environment=NODE_OPTIONS=--max-old-space-size=$HEAP_MB
 ExecStart=/usr/bin/npx next start -H 127.0.0.1 -p $PORT
+MemoryMax=$MEM_MAX
 Restart=always
 RestartSec=5
 NoNewPrivileges=true

@@ -82,7 +82,14 @@ if [[ "$MODE" == "update" ]]; then
   elif [[ -f "$APP_DIR/.deploy-source" && -d "$(cat "$APP_DIR/.deploy-source")" ]]; then
     SRC=$(cat "$APP_DIR/.deploy-source")
     say "Syncing from $SRC"
-    [[ -d "$SRC/.git" ]] && sudo -u "$APP_USER" git -C "$SRC" pull --ff-only || true
+    # A failed pull here used to be swallowed by `|| true`, and the rsync below would then copy the
+    # UNCHANGED tree while the script reported "Updated and restarted". A deploy that ships the old code
+    # and calls it success is worse than one that stops, so this stops.
+    if [[ -d "$SRC/.git" ]]; then
+      sudo -u "$APP_USER" git -C "$SRC" pull --ff-only         || die "git pull failed in $SRC. Nothing was deployed and the running app is untouched. Resolve it there, then re-run this update.
+       Local changes blocking the merge?  git -C $SRC diff
+       Only the execute bit differs?      git -C $SRC config core.fileMode false"
+    fi
     rsync -a --delete --exclude ".env" --exclude "node_modules" --exclude ".next" --exclude ".git" --exclude ".deploy-source" "$SRC"/ "$APP_DIR"/
     echo "$SRC" > "$APP_DIR/.deploy-source"; chown -R "$APP_USER:$APP_USER" "$APP_DIR"
   else
@@ -94,6 +101,14 @@ if [[ "$MODE" == "update" ]]; then
     rm -rf "$TMP"; chown -R "$APP_USER:$APP_USER" "$APP_DIR"
   fi
   sudo -u "$APP_USER" bash -lc "cd '$APP_DIR' && npm ci --no-audit --no-fund && npx prisma db push --skip-generate && npm run build"
+  # Installs predating the heap ceiling get it here rather than needing a reinstall. Idempotent: a unit
+  # already carrying NODE_OPTIONS is left alone, so a value tuned by hand survives updates.
+  UNIT_FILE="/etc/systemd/system/$APP_NAME.service"
+  if [[ -f "$UNIT_FILE" ]] && ! grep -q "NODE_OPTIONS" "$UNIT_FILE"; then
+    sed -i "/^Environment=NODE_ENV=production\$/a Environment=NODE_OPTIONS=--max-old-space-size=${HEAP_MB:-384}" "$UNIT_FILE"
+    systemctl daemon-reload
+    ok "Added a ${HEAP_MB:-384}MB heap ceiling to $APP_NAME.service"
+  fi
   systemctl restart "$APP_NAME"
   # Refresh scheduled jobs from vercel.json (new jobs such as lock/results appear automatically)
   CRON_SECRET=$(grep -E '^CRON_SECRET=' "$APP_DIR/.env" | head -1 | cut -d= -f2-)
@@ -292,7 +307,23 @@ ok "Build complete"
 # =============================================================================
 #  6. SYSTEMD SERVICE
 # =============================================================================
-say "Creating systemd service '$APP_NAME'"
+# -- Why the heap ceiling is not optional on a small box ---------------------------------------------
+#
+# V8 sizes its default old-space from total RAM. On a 2GB machine that lands around 1.5GB, so Node will
+# happily grow to 1.5GB before it feels any need to collect -- and on a box that also runs Postgres and
+# other apps, the kernel's OOM killer gets there first. That is not hypothetical: this app was killed at
+# 1.63GB resident, and because the shortage was machine-wide rather than a cgroup limit, it took every
+# other app on the box down with it.
+#
+# It was not a leak, and not one enormous query. A request that allocates a few hundred megabytes of
+# short-lived objects is fine; it only turns fatal when nothing prompts a collection before the limit.
+# With an explicit ceiling V8 collects as it approaches it and the process stays bounded.
+#
+# 384MB suits a secondary app sharing a 2GB box. Raise it with HEAP_MB on a bigger machine, or if the app
+# starts logging heap-allocation failures -- an error on one page is a far better outcome than an OOM
+# kill that takes the whole machine with it, but it still wants looking at.
+HEAP_MB=${HEAP_MB:-384}
+say "Creating systemd service '$APP_NAME' (heap ceiling ${HEAP_MB}MB)"
 cat > "/etc/systemd/system/$APP_NAME.service" <<UNIT
 [Unit]
 Description=$APP_NAME (Next.js)
@@ -307,6 +338,7 @@ EnvironmentFile=$ENV_FILE
 Environment=NODE_ENV=production
 Environment=PORT=$PORT
 Environment=HOSTNAME=127.0.0.1
+Environment=NODE_OPTIONS=--max-old-space-size=$HEAP_MB
 ExecStart=/usr/bin/npx next start -H 127.0.0.1 -p $PORT
 Restart=always
 RestartSec=5

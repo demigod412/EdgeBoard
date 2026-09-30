@@ -48,11 +48,39 @@ export type BoardGame = Prisma.GameGetPayload<{ include: typeof gameIncludeLean 
  * The margin here is deliberate — an hourly sync puts at most a row or two after a lock, and these take
  * two orders of magnitude more than that.
  */
-export const LINE_TAKE = Number(process.env.LINE_TAKE) || 24;
-/** For a query spanning every market rather than moneyline alone, so each market still gets a slice. */
-export const LINE_TAKE_ALL = Number(process.env.LINE_TAKE_ALL) || 80;
-/** Games a board or list may carry at once. Start order, so the cut falls on the furthest away. */
-export const BOARD_LIMIT = Number(process.env.BOARD_LIMIT) || 1500;
+/*
+ * Two different needs, and they want very different numbers.
+ *
+ * An UPCOMING game wants the newest price per market — latestLines() with no cutoff returns the first row
+ * it sees per market, and rows arrive newest-first. Four markets means four useful rows. Fetching eighty
+ * was ~20x waste on the largest queries in the app, and at a 384MB heap ceiling that waste does not show
+ * up as an OOM any more; it shows up as ninety seconds of garbage collection.
+ *
+ * A SETTLED game wants the newest price BEFORE the lock, so it has to reach back past whatever was
+ * written after it. An ingest every three hours puts a row or two after a lock, so a dozen per market is
+ * already generous.
+ */
+export const LINE_TAKE_LATEST = Number(process.env.LINE_TAKE_LATEST) || 6;
+/** Pre-lock, moneyline only. */
+export const LINE_TAKE_PRELOCK = Number(process.env.LINE_TAKE_PRELOCK) || 12;
+/** Pre-lock across all four markets, so each still gets a slice. */
+export const LINE_TAKE_PRELOCK_ALL = Number(process.env.LINE_TAKE_PRELOCK_ALL) || 40;
+
+/*
+ * Games a request may carry, across every sport it covers rather than per sport: "all sports" tripled the
+ * three biggest queries at a stroke, which is not what a scope toggle should cost.
+ */
+export const BOARD_LIMIT = Number(process.env.BOARD_LIMIT) || 600;
+/**
+ * Games the slip builder searches over.
+ *
+ * Lower, because the builder multiplies: each game becomes seven-odd candidate legs and the slip search
+ * then runs over the lot, three times. Two hundred games is already 1,400 legs, far more than any target
+ * the page offers needs.
+ */
+export const BUILDER_LIMIT = Number(process.env.BUILDER_LIMIT) || 200;
+/** Split a whole-request ceiling across the sports in scope. */
+export const perSport = (limit: number, sports: number) => Math.max(1, Math.ceil(limit / Math.max(1, sports)));
 
 export async function getBoard(sport: SportId, o: {
   from: Date; to: Date; leagueId?: string; take?: number; moneyline?: boolean;
@@ -63,7 +91,7 @@ export async function getBoard(sport: SportId, o: {
     include: {
       ...gameIncludeLean,
       // Opt-in, and only the market that asked for it: the upset list needs a price, nothing else does.
-      ...(o.moneyline ? { lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE } } : {}),
+      ...(o.moneyline ? { lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } } : {}),
     },
     orderBy: { startUtc: "asc" },
     take: o.take ?? BOARD_LIMIT,

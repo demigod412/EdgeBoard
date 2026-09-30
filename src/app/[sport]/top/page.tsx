@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Source } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dataMode } from "@/lib/mode";
-import { gameIncludeLean, HEAVY_JSON, LINE_TAKE_ALL, BOARD_LIMIT } from "@/lib/queries";
+import { gameIncludeLean, HEAVY_JSON, LINE_TAKE_LATEST, LINE_TAKE_PRELOCK_ALL, BOARD_LIMIT, perSport } from "@/lib/queries";
 import { selectTop, tipsFor, TOP_N, WINDOWS, type Tip } from "@/lib/top";
 import { flatStakeRoi, latestLines, selectTopValue, valueTips, VALUE, type ValueTip } from "@/lib/value";
 import { GROUP_LABEL, hitOf, TOP_CAPS, type Group } from "@/lib/markets";
@@ -42,8 +42,9 @@ export default async function Top({ params, searchParams }: { params: Promise<{ 
 
   const games = (await Promise.all(sports.map((s) => prisma.game.findMany({
     where: { sport: SPORT_ENUM[s], source: sources[s], status: "SCHEDULED", startUtc: { gt: now, lt: end } },
-    include: { ...gameIncludeLean, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_ALL } },
-    take: BOARD_LIMIT,
+    // Upcoming: latestLines() is called without a cutoff here, so only the newest row per market is read.
+    include: { ...gameIncludeLean, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } },
+    take: perSport(BOARD_LIMIT, sports.length),
   })))).flat();
 
   let likely: { g: (typeof games)[number]; t: Tip }[] = [], value: { g: (typeof games)[number]; t: ValueTip }[] = [];
@@ -61,7 +62,8 @@ export default async function Top({ params, searchParams }: { params: Promise<{ 
     where: { sport: SPORT_ENUM[s], lockedAt: { not: null }, game: { source: sources[s], startUtc: { gte: new Date(todayStart.getTime() - 7 * DAY), lt: todayStart }, results: { some: {} } } },
     omit: HEAVY_JSON,
     // Was every line row for every settled game in the window, across all four markets.
-    include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 }, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_ALL } } } },
+    // Settled: this one reaches back past the lock, so it needs more than the newest row.
+    include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 }, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_PRELOCK_ALL } } } },
   })))).flat();
   const byDay = new Map<string, typeof locked>();
   locked.forEach((p) => { const k = dayKey(p.game.startUtc); byDay.set(k, [...(byDay.get(k) ?? []), p]); });

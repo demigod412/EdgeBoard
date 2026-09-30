@@ -111,6 +111,11 @@ model MarketLine {
   bookmaker String
   fetchedAt DateTime @default(now())
   @@index([gameId, market, fetchedAt])
+  // The same columns without `market` in the middle. The pages ask for "the newest rows for this game"
+  // across all markets at once, so they order by fetchedAt within a gameId and never constrain market.
+  // The index above cannot serve that — market sits between the two columns in use — so Postgres sorted
+  // the game's whole line history on every request. On an append-only table that history only grows.
+  @@index([gameId, fetchedAt])
 }
 
 model TeamRating {

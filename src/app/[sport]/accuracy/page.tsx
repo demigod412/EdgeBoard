@@ -8,7 +8,7 @@ import { MODEL_VERSION } from "@/lib/model/constants";
 import { Card, SectionTitle, cn, pct } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { BrierChart } from "@/components/BrierChart";
-import { HEAVY_JSON, LINE_TAKE } from "@/lib/queries";
+import { HEAVY_JSON, LINE_TAKE_PRELOCK } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 const f3 = (x: number) => x.toFixed(3);
@@ -30,7 +30,7 @@ export default async function Accuracy({ params }: { params: Promise<{ sport: Sp
     omit: HEAVY_JSON,
     include: { game: { include: {
       results: { orderBy: { settledAt: "desc" }, take: 1 },
-      lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE },
+      lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_PRELOCK },
     } } },
   });
   const cal = await prisma.calibrationModel.findMany({ where: { sport: SPORT_ENUM[sport], modelVersion: MODEL_VERSION, active: true }, orderBy: { market: "asc" } });

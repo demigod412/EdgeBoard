@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.12.1 — the pages load in seconds rather than minutes
+
+0.12.0 stopped the OOM kills. It did not make the pages usable: Top across all sports took **92s**, the
+upset scanner **114s**, the builder **120s**, with the service pinned at 481MB of its 550MB budget and
+68MB of headroom. An OOM kill had become garbage collection and kernel reclaim instead. Three causes.
+
+### The line limits were about twenty times too generous
+`latestLines()` returns the first row it sees per market, and rows arrive newest-first. So a page looking
+at an **upcoming** game needs the newest row per market — four markets, four useful rows. It was fetching
+**eighty**. Four of the six call sites pass no cutoff at all and were paying that.
+
+Only the settled-record queries reach back past the lock, and they are the ones that genuinely need depth.
+Split accordingly:
+
+| Need | Was | Now |
+| --- | --- | --- |
+| Upcoming game, newest price per market | 80 | **6** (`LINE_TAKE_LATEST`) |
+| Settled, pre-lock, moneyline only | 24 | **12** (`LINE_TAKE_PRELOCK`) |
+| Settled, pre-lock, all four markets | 80 | **40** (`LINE_TAKE_PRELOCK_ALL`) |
+
+### A missing index
+`MarketLine` was indexed on `(gameId, market, fetchedAt)`. The pages ask for the newest rows **for a game
+across all markets**, so they order by `fetchedAt` within a `gameId` and never constrain `market` — and an
+index with `market` between the two columns in use cannot serve that. Postgres sorted each game's entire
+line history on every request, on a table that only grows. Added `(gameId, fetchedAt)`.
+
+### "All sports" silently tripled the work
+`BOARD_LIMIT` was applied per sport, so the scope toggle multiplied the three largest queries by three. It
+is now a whole-request ceiling divided across the sports in scope (600), and the builder — which turns
+each game into seven-odd candidate legs and then searches over the lot three times — has its own much
+smaller one (`BUILDER_LIMIT`, 200).
+
+### If it is still slow
+The service is capped at 550MB with a 384MB heap. If these cuts are not enough, the app's working set
+genuinely exceeds its budget and the limits need raising rather than the queries cutting further — which
+on a 1.9GB box shared with two other apps means freeing room first.
+
 ## 0.12.0 — the memory fault: why this app kept taking the whole box down
 
 EdgeBoard was OOM-killed at **1.63GB resident**, and because the shortage was machine-wide rather than a

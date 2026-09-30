@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Source } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dataMode } from "@/lib/mode";
-import { gameIncludeLean, HEAVY_JSON, LINE_TAKE_ALL, BOARD_LIMIT } from "@/lib/queries";
+import { gameIncludeLean, HEAVY_JSON, LINE_TAKE_LATEST, BUILDER_LIMIT, perSport } from "@/lib/queries";
 import { marketsOf } from "@/lib/picks";
 import { GROUP_LABEL, hitOf, type Group } from "@/lib/markets";
 import { buildSlips, legHint, oneInN, SAFE_MAX_LEG_ODDS, type Candidate } from "@/lib/builder";
@@ -52,8 +52,8 @@ export default async function Builder({ params, searchParams }: {
   const sources = Object.fromEntries(await Promise.all(sports.map(async (s) => [s, (await dataMode(s)).source] as const))) as Record<SportId, Source>;
   const games = (await Promise.all(sports.map((s) => prisma.game.findMany({
     where: { sport: SPORT_ENUM[s], source: sources[s], status: "SCHEDULED", startUtc: { gt: now, lt: end } },
-    include: { ...gameIncludeLean, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_ALL } },
-    take: BOARD_LIMIT,
+    include: { ...gameIncludeLean, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } },
+    take: perSport(BUILDER_LIMIT, sports.length),
   })))).flat();
 
   const sportOf = (e: string) => SPORT_IDS.find((s) => SPORT_ENUM[s] === e)!;

@@ -4,17 +4,69 @@ import { prisma } from "./db";
 import { dataMode } from "./mode";
 import { SPORT_ENUM, type SportId } from "./sports";
 
+/*
+ * ── What a list query must not load ────────────────────────────────────────────────────────────────
+ *
+ * A Prediction carries four Json blobs. `picks` is read everywhere, through marketsOf(). The other
+ * three are not: `ladders` and `rationale` only on a single game page, and `features` nowhere in the UI
+ * at all. So lists drop them.
+ *
+ * `omit` rather than an explicit `select`, so a scalar added later is included automatically instead of
+ * going silently missing from every list.
+ */
+export const HEAVY_JSON = { ladders: true, rationale: true, features: true } as const;
+// Not `as const`: that makes orderBy a readonly tuple, which Prisma's mutable OrderByInput[] rejects
+// the moment this is spread into an inline include.
+const latestPrediction = { orderBy: [{ lockedAt: { sort: "desc" as const, nulls: "last" as const } }, { revision: "desc" as const }], take: 1 };
+
+/** Everything, for one game. Only the game page should use this. */
 export const gameInclude = {
   homeTeam: true, awayTeam: true, league: true,
-  predictions: { orderBy: [{ lockedAt: { sort: "desc", nulls: "last" } }, { revision: "desc" }], take: 1 },
+  predictions: latestPrediction,
 } satisfies Prisma.GameInclude;
-export type BoardGame = Prisma.GameGetPayload<{ include: typeof gameInclude }>;
 
-export async function getBoard(sport: SportId, o: { from: Date; to: Date; leagueId?: string }) {
+/** The same without the three unread blobs. What every list and board should use. */
+export const gameIncludeLean = {
+  homeTeam: true, awayTeam: true, league: true,
+  predictions: { ...latestPrediction, omit: HEAVY_JSON },
+} satisfies Prisma.GameInclude;
+
+export type BoardGame = Prisma.GameGetPayload<{ include: typeof gameIncludeLean }>;
+
+/*
+ * ── Why every line query carries a take ────────────────────────────────────────────────────────────
+ *
+ * MarketLine is append-only: ingest CREATES a row per market per game every run, whether the price moved
+ * or not. On an hourly sync a game sitting in the seven-day window accumulates on the order of a hundred
+ * rows per market before it is even played, and nothing prunes them.
+ *
+ * Three pages joined across all of them with no limit — the accuracy page over every locked call ever
+ * recorded. That is how one request came to allocate 1.6GB and take the whole machine down with it.
+ *
+ * What the pages actually want is the newest row before the lock, so a bounded slice of the NEWEST rows
+ * is enough: rows arrive in time order, so a suffix of the timeline always contains the lock boundary.
+ * The margin here is deliberate — an hourly sync puts at most a row or two after a lock, and these take
+ * two orders of magnitude more than that.
+ */
+export const LINE_TAKE = Number(process.env.LINE_TAKE) || 24;
+/** For a query spanning every market rather than moneyline alone, so each market still gets a slice. */
+export const LINE_TAKE_ALL = Number(process.env.LINE_TAKE_ALL) || 80;
+/** Games a board or list may carry at once. Start order, so the cut falls on the furthest away. */
+export const BOARD_LIMIT = Number(process.env.BOARD_LIMIT) || 1500;
+
+export async function getBoard(sport: SportId, o: {
+  from: Date; to: Date; leagueId?: string; take?: number; moneyline?: boolean;
+}) {
   const { source } = await dataMode(sport);
   return prisma.game.findMany({
     where: { sport: SPORT_ENUM[sport], source, startUtc: { gte: o.from, lt: o.to }, ...(o.leagueId ? { leagueId: o.leagueId } : {}) },
-    include: gameInclude, orderBy: { startUtc: "asc" },
+    include: {
+      ...gameIncludeLean,
+      // Opt-in, and only the market that asked for it: the upset list needs a price, nothing else does.
+      ...(o.moneyline ? { lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE } } : {}),
+    },
+    orderBy: { startUtc: "asc" },
+    take: o.take ?? BOARD_LIMIT,
   });
 }
 export async function getLeagues(sport: SportId) {

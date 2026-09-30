@@ -2,7 +2,10 @@
 // predictions append-only (new revision, never edit a locked row); results append-only.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // `omit` on a relation select, so a list query can drop the heavy Json without hand-listing the
+  // thirty-odd scalar columns it does want — and so a column added later is carried automatically.
+  previewFeatures = ["omitApi"]
 }
 
 datasource db {

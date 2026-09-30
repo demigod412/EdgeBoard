@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Source } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dataMode } from "@/lib/mode";
-import { gameInclude } from "@/lib/queries";
+import { gameIncludeLean, HEAVY_JSON, LINE_TAKE_ALL, BOARD_LIMIT } from "@/lib/queries";
 import { marketsOf } from "@/lib/picks";
 import { GROUP_LABEL, hitOf, type Group } from "@/lib/markets";
 import { buildSlips, legHint, oneInN, SAFE_MAX_LEG_ODDS, type Candidate } from "@/lib/builder";
@@ -52,7 +52,8 @@ export default async function Builder({ params, searchParams }: {
   const sources = Object.fromEntries(await Promise.all(sports.map(async (s) => [s, (await dataMode(s)).source] as const))) as Record<SportId, Source>;
   const games = (await Promise.all(sports.map((s) => prisma.game.findMany({
     where: { sport: SPORT_ENUM[s], source: sources[s], status: "SCHEDULED", startUtc: { gt: now, lt: end } },
-    include: { ...gameInclude, lines: { orderBy: { fetchedAt: "desc" }, take: 20 } },
+    include: { ...gameIncludeLean, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_ALL } },
+    take: BOARD_LIMIT,
   })))).flat();
 
   const sportOf = (e: string) => SPORT_IDS.find((s) => SPORT_ENUM[s] === e)!;
@@ -86,6 +87,7 @@ export default async function Builder({ params, searchParams }: {
   const since = new Date(now.getTime() - 14 * DAY);
   const locked = (await Promise.all(sports.map((s) => prisma.prediction.findMany({
     where: { sport: SPORT_ENUM[s], lockedAt: { not: null }, game: { source: sources[s], startUtc: { gte: since, lt: new Date(`${dayKey(now)}T00:00:00Z`) }, results: { some: {} } } },
+    omit: HEAVY_JSON,
     include: { game: { include: { homeTeam: true, awayTeam: true, league: true, results: { orderBy: { settledAt: "desc" }, take: 1 } } } },
   })))).flat();
   const byDay = new Map<string, typeof locked>();

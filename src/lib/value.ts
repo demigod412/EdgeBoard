@@ -1,5 +1,5 @@
-import type { MarketLine, Prediction } from "@prisma/client";
-import { marketsOf } from "./picks";
+import type { MarketLine } from "@prisma/client";
+import { marketsOf, type PredictionSource } from "./picks";
 import type { Mkt } from "./markets";
 
 /*
@@ -26,7 +26,7 @@ export function oddsFor(m: Mkt, lines: ReturnType<typeof latestLines>): number |
   return null;
 }
 
-export function valueTips(p: Prediction, lines: ReturnType<typeof latestLines>): ValueTip[] {
+export function valueTips(p: PredictionSource, lines: ReturnType<typeof latestLines>): ValueTip[] {
   if (p.band === "LOW") return [];
   return marketsOf(p).flatMap((m) => {
     const o = oddsFor(m, lines);

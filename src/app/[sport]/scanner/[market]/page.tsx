@@ -3,7 +3,6 @@ import Link from "next/link";
 import { getBoard } from "@/lib/queries";
 import { SCANNERS, scan, DEFAULT_FLOORS, type Floors, type Pick, type ScannerSlug } from "@/lib/picks";
 import { getSetting } from "@/lib/secrets";
-import { prisma } from "@/lib/db";
 import { latestLines, valueTips } from "@/lib/value";
 import { marketsOf } from "@/lib/picks";
 import { BlendBuilder, type BlendCandidate } from "@/components/BlendBuilder";
@@ -18,7 +17,15 @@ export default async function Scanner({ params }: { params: Promise<{ sport: Spo
   const cfg = SPORTS[sport];
   const floors = { ...DEFAULT_FLOORS, ...(await getSetting<Partial<Floors>>("floors", {})) };
   const now = new Date();
-  const games = (await getBoard(sport, { from: now, to: new Date(now.getTime() + 7 * 86_400_000) })).filter((g) => g.predictions[0]);
+  /*
+   * The upset list is the only scanner that needs a bookmaker price, so it is the only one that asks for
+   * lines — and it asks for them on the game, bounded, instead of pulling every line row for every
+   * market for every game in the window into one array and scanning it per game.
+   */
+  const needsOdds = def.slug === "upset";
+  const games = (await getBoard(sport, {
+    from: now, to: new Date(now.getTime() + 7 * 86_400_000), moneyline: needsOdds,
+  })).filter((g) => g.predictions[0]);
   const focus = new Map<string, Pick | null>();
   if (def.slug === "blend") {
     const cands: BlendCandidate[] = games.map((g) => ({
@@ -37,9 +44,8 @@ export default async function Scanner({ params }: { params: Promise<{ sport: Spo
     );
   }
   // Upset watch: underdog moneyline where the model gives ≥ 5% edge over the bookmaker price
-  const upsetLines = def.slug === "upset" ? await prisma.marketLine.findMany({ where: { gameId: { in: games.map((g) => g.id) } }, orderBy: { fetchedAt: "desc" } }) : [];
   const upset = (g: (typeof games)[number]): Pick | null => {
-    const v = valueTips(g.predictions[0], latestLines(upsetLines.filter((l) => l.gameId === g.id))).find((t) => t.kind === "win" && t.p < 0.5 && t.edge >= 0.05);
+    const v = valueTips(g.predictions[0], latestLines("lines" in g ? g.lines : [])).find((t) => t.kind === "win" && t.p < 0.5 && t.edge >= 0.05);
     return v ? { market: "win", side: v.side, line: null, p: v.p, label: `${v.label} @${v.odds.toFixed(2)} (+${Math.round(v.edge * 100)}%)` } : null;
   };
   const hits = games.filter((g) => { const k = def.slug === "upset" ? upset(g) : scan(def.slug as ScannerSlug, g.predictions[0], floors); focus.set(g.id, k); return !!k; })

@@ -7,6 +7,7 @@ import { marketTrust, trustKey } from "../trust";
 import { computeAccuracy, type ScoredCall } from "../accuracy";
 import { marketsOf } from "../picks";
 import type { SportProvider } from "../providers/types";
+import { HEAVY_JSON } from "../queries";
 
 const LOCK_MIN = Number(process.env.PREDICTION_LOCK_MINUTES ?? 15);
 
@@ -74,8 +75,12 @@ export async function settle(db: PrismaClient, sport?: SportId) {
  * computed per request: the builder would otherwise re-read the ledger on every target change.
  */
 export async function refreshMarketTrust(db: PrismaClient, sport: SportId, source: "API_SPORTS" | "OPEN", days = 180) {
+  // Lean: this reads `picks` (through marketsOf), the band and the win probability. Six months of full
+  // rows would carry three Json blobs per call that nothing here opens — and this runs on a cron inside
+  // the web server, so its memory is the web server's.
   const rows = await db.prediction.findMany({
     where: { sport: SPORT_ENUM[sport], lockedAt: { not: null }, game: { source, results: { some: {} }, startUtc: { gte: new Date(Date.now() - days * 86_400_000) } } },
+    omit: HEAVY_JSON,
     include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 } } } },
   });
   const calls: ScoredCall[] = rows.map((p) => {

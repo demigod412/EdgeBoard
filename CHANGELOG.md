@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.12.0 — the memory fault: why this app kept taking the whole box down
+
+EdgeBoard was OOM-killed at **1.63GB resident**, and because the shortage was machine-wide rather than a
+cgroup limit it took the two sibling apps down with it. The machine needed a reboot. It had a heap ceiling
+added at the systemd level in 0.11.x, which contained the blast radius; this release fixes what was
+allocating that much in the first place.
+
+### The root cause: an append-only odds table, read without limits
+`MarketLine` is append-only. Ingest **creates** a row per market per game every run, whether the price
+moved or not. Sync runs every three hours per sport, so a game sitting in the seven-day window collects
+around 56 rows per market before it is played — over 200 across the four markets — and nothing prunes
+them.
+
+Three pages then joined across all of them with **no limit at all**:
+
+| Page | What it loaded |
+| --- | --- |
+| Accuracy | Every locked call **ever recorded**, each with every moneyline row ever fetched for its game |
+| Top | 7 days of settled games, each with every line row across all four markets |
+| Scanner (Upset) | Every line row for every market for every game in the window, into one array, then scanned per game |
+
+The accuracy page is the one that could not survive. It has no date bound by design — the ledger is the
+point of it — so its cost grew with every game ever played, multiplied by an odds history that grows every
+three hours. It was fine for months and then it wasn't.
+
+### The fix
+**Every line query now has a take.** What the pages actually want is the newest row before the lock, and
+rows arrive in time order, so a bounded slice of the newest rows always contains the lock boundary: 24 for
+a moneyline-only query, 80 where all four markets share the slice. A three-hourly sync puts at most a row
+or two after a lock, so that is two orders of magnitude of margin. Tunable with `LINE_TAKE` and
+`LINE_TAKE_ALL`.
+
+**Lists no longer load the unread Json.** A prediction carries four blobs. `picks` is read everywhere,
+through `marketsOf()`. The other three are not — `ladders` and `rationale` only on a single game page, and
+`features` nowhere in the UI at all — so lists drop them. Written as an `omit` so a column added later is
+carried automatically rather than going silently missing.
+
+**The upset scanner asks for lines on the game**, bounded, instead of pulling every line row into one
+array and filtering it per game. That removes a quadratic scan as well as the memory.
+
+**Board queries have a ceiling** (`BOARD_LIMIT`, 1500) in start order, so a long window trims the
+furthest-away games instead of failing.
+
+**The cron path was hit too.** `refreshMarketTrust` loads six months of locked calls, and the crons run
+over HTTP — inside the web server — so its memory *is* the web server's. Now lean.
+
+Nothing visible changes: the same games, the same probabilities, the same accuracy figures over the same
+all-time ledger.
+
+### Still worth doing
+Ingest should stop writing a row when the price has not moved. That is the actual source of the growth —
+the read-side limits above stop it being fatal, but the table keeps growing at a few hundred rows per game
+regardless, and a dedupe on write would shrink it by roughly the poll count. Left out of this release
+because it changes the ingest path rather than just how it is read.
+
 ## 0.11.0 — Sportybet booking codes actually work
 - **Fix: booking has never produced a code on any sport, because `marketId` was missing.** Sportybet's
   `pcUpcomingEvents` **requires** it. Omitting it does not mean "all markets" — the endpoint answers

@@ -1,5 +1,4 @@
-import type { Prediction } from "@prisma/client";
-import { marketsOf } from "./picks";
+import { marketsOf, type PredictionSource } from "./picks";
 import { headlineExcluded, hitOf, TOP_CAPS, type GameResult, type Group, type Mkt } from "./markets";
 
 /*
@@ -15,14 +14,14 @@ export interface Tip extends Mkt { strength: number }
 
 export const strengthOf = (p: number, confidence: number) => p * (0.85 + 0.15 * (confidence / 100));
 
-export function tipsFor(p: Prediction, group?: Group): Tip[] {
+export function tipsFor(p: PredictionSource, group?: Group): Tip[] {
   if (p.band === "LOW") return [];
   return marketsOf(p).filter((m) => m.p >= MIN_P && (!m.alt || m.strong) && (!group || m.group === group))
     .map((m) => ({ ...m, strength: strengthOf(m.p, p.confidence) })).sort((a, b) => b.strength - a.strength);
 }
 
 /** Headline pick for a game: never "no overtime" or an underdog + handicap. */
-export function bestTip(p: Prediction, group?: Group): Tip | null {
+export function bestTip(p: PredictionSource, group?: Group): Tip | null {
   return tipsFor(p, group).find((t) => group || !headlineExcluded(t)) ?? null;
 }
 

@@ -4,13 +4,22 @@ import { headlineExcluded, type Mkt } from "./markets";
 
 export interface Pick { market: "win" | "total" | "spread" | "seg"; side: string; line: number | null; p: number; label: string }
 export interface Picks { win: Pick; total: Pick; spread: Pick; seg: Pick; strongTotal: Pick | null; strongSpread: Pick | null; strongSeg: Pick | null; best: Pick }
-export const picksOf = (p: Prediction) => p.picks as unknown as Picks;
+/**
+ * The prediction fields these helpers read: everything except the three blobs a list query drops.
+ *
+ * An exclusion rather than a list of the thirty-odd scalars, so a column added later is covered without
+ * touching this. A full row satisfies it too, so the game page keeps working unchanged. `ladders` is
+ * excluded here and taken explicitly by laddersOf, which only the game page calls.
+ */
+export type PredictionSource = Omit<Prediction, "ladders" | "rationale" | "features">;
+
+export const picksOf = (p: PredictionSource) => p.picks as unknown as Picks;
 
 /** Flat market list for a prediction (older rows without one are rebuilt from their picks). */
 /** Markets retired from the app: "no overtime / no extra innings", and both-teams-score in baseball. */
-const retired = (p: Prediction, m: Mkt) => (m.kind === "ot" && m.side === "no") || (m.kind === "btts" && p.sport === "BASEBALL");
+const retired = (p: PredictionSource, m: Mkt) => (m.kind === "ot" && m.side === "no") || (m.kind === "btts" && p.sport === "BASEBALL");
 
-export function marketsOf(p: Prediction): Mkt[] {
+export function marketsOf(p: PredictionSource): Mkt[] {
   const k = p.picks as unknown as Picks & { markets?: Mkt[] };
   if (k.markets?.length) return k.markets.filter((m) => !retired(p, m));
   const conv = (x: Pick | null, strong = false): Mkt | null => x && ({
@@ -41,7 +50,7 @@ export const SCANNERS = [
 ] as const;
 export type ScannerSlug = (typeof SCANNERS)[number]["slug"];
 
-export function scan(slug: ScannerSlug, p: Prediction, f: Floors): Pick | null {
+export function scan(slug: ScannerSlug, p: PredictionSource, f: Floors): Pick | null {
   const k = picksOf(p);
   switch (slug) {
     case "best": return k.best;

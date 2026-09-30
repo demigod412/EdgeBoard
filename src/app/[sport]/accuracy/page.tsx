@@ -8,6 +8,7 @@ import { MODEL_VERSION } from "@/lib/model/constants";
 import { Card, SectionTitle, cn, pct } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { BrierChart } from "@/components/BrierChart";
+import { HEAVY_JSON, LINE_TAKE } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 const f3 = (x: number) => x.toFixed(3);
@@ -15,9 +16,22 @@ const f3 = (x: number) => x.toFixed(3);
 export default async function Accuracy({ params }: { params: Promise<{ sport: SportId }> }) {
   const { sport } = await params; const cfg = SPORTS[sport];
   const { source, demo } = await dataMode(sport);
+  /*
+   * Deliberately unbounded in time: the ledger is the point of this page, and a Brier score over "the
+   * last month" would be a different and weaker claim.
+   *
+   * It is bounded in the two dimensions that were actually costing gigabytes. The prediction rows drop
+   * the three blobs nothing here reads (`picks` is kept — marketsOf needs it), and the moneyline history
+   * is capped: this joined every line row ever fetched for every game ever settled, which on an
+   * append-only table with an hourly sync grows without limit.
+   */
   const rows = await prisma.prediction.findMany({
     where: { sport: SPORT_ENUM[sport], lockedAt: { not: null }, game: { source, results: { some: {} } } },
-    include: { game: { include: { results: { orderBy: { settledAt: "desc" }, take: 1 }, lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" } } } } },
+    omit: HEAVY_JSON,
+    include: { game: { include: {
+      results: { orderBy: { settledAt: "desc" }, take: 1 },
+      lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE },
+    } } },
   });
   const cal = await prisma.calibrationModel.findMany({ where: { sport: SPORT_ENUM[sport], modelVersion: MODEL_VERSION, active: true }, orderBy: { market: "asc" } });
   const header = (

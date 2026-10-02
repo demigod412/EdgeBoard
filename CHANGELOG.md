@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.12.2 — the pages report their own timings
+
+The scanner renders 317 games from under a megabyte of data and takes ninety seconds doing it, allocating
+hundreds of megabytes on the way. Two rounds of reading the code produced two wrong explanations — the
+odds history (15,143 rows, 4.6MB in total, so it could never have mattered) and the prediction blobs on
+list pages (real, and worth fixing, but the accuracy page was the only one carrying them).
+
+Nothing left in that path is expensive on inspection: the query returns 317 rows, `scan("best")` is a
+property read, `markets.ts` is 52 lines and the row component has no awaits in it. So the page now measures
+itself instead, and prints one line per render to stderr — `journalctl -u edgearena`:
+
+```
+[timing] scanner/best query=180ms(317 games) scan=12ms(310 hits) total=195ms rss=240MB heap=120MB
+```
+
+If `total` is small and the request still takes ninety seconds, the time is in rendering the rows and
+nothing before it. If `query` is the ninety seconds, it is the database. Either way the next change will be
+aimed at something measured rather than something plausible.
+
+Always on, not behind a flag: it is one short line on pages that take seconds, and a flag would be off on
+the machine that has the problem.
+
+### One real fix along the way
+`GameList` grouped games by league with `groups.set(k, [...(groups.get(k) ?? []), g])`, which copies the
+whole bucket on every insert — O(n²) allocations to build a grouping. Now it pushes. Not the ninety
+seconds, but not nothing either.
+
 ## 0.12.1 — the pages load in seconds rather than minutes
 
 0.12.0 stopped the OOM kills. It did not make the pages usable: Top across all sports took **92s**, the

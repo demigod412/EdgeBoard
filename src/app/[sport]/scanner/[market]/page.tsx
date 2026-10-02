@@ -10,6 +10,7 @@ import { fmtWat } from "@/lib/time";
 import { SPORTS, type SportId } from "@/lib/sports";
 import { GameList } from "@/components/GameList";
 import { EmptyState } from "@/components/EmptyState";
+import { phases } from "@/lib/timing";
 
 export default async function Scanner({ params }: { params: Promise<{ sport: SportId; market: string }> }) {
   const { sport, market } = await params;
@@ -22,16 +23,20 @@ export default async function Scanner({ params }: { params: Promise<{ sport: Spo
    * lines — and it asks for them on the game, bounded, instead of pulling every line row for every
    * market for every game in the window into one array and scanning it per game.
    */
+  const T = phases(`scanner/${def.slug}`);
   const needsOdds = def.slug === "upset";
   const games = (await getBoard(sport, {
     from: now, to: new Date(now.getTime() + 7 * 86_400_000), moneyline: needsOdds,
   })).filter((g) => g.predictions[0]);
+  T.mark("query", `${games.length} games`);
   const focus = new Map<string, Pick | null>();
   if (def.slug === "blend") {
     const cands: BlendCandidate[] = games.map((g) => ({
       id: g.id, title: `${g.awayTeam.shortName ?? g.awayTeam.name} at ${g.homeTeam.shortName ?? g.homeTeam.name}`, when: fmtWat(g.startUtc, "EEE HH:mm"), band: g.predictions[0].band,
       markets: marketsOf(g.predictions[0]).filter((m) => m.p >= 0.05).map((m) => ({ key: m.key, label: m.short, p: m.p, group: m.group })),
     }));
+    T.mark("candidates", `${cands.length} games`);
+    T.done();
     return (
       <>
         <header className="mb-4">
@@ -50,6 +55,8 @@ export default async function Scanner({ params }: { params: Promise<{ sport: Spo
   };
   const hits = games.filter((g) => { const k = def.slug === "upset" ? upset(g) : scan(def.slug as ScannerSlug, g.predictions[0], floors); focus.set(g.id, k); return !!k; })
     .sort((a, b) => focus.get(b.id)!.p - focus.get(a.id)!.p);
+  T.mark("scan", `${hits.length} hits`);
+  T.done();
   const rename = (s: string) => s.replace("Handicap", cfg.handicapName).replace("Segment", cfg.segmentName).replace("segment", cfg.segmentName.toLowerCase());
   return (
     <>

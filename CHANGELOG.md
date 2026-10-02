@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.15.0 — re-price without touching the provider
+
+`npm run repredict` refits each league from stored results and rewrites the predictions for its upcoming
+games. No network, so it costs nothing against the API plan and is safe to run as often as you like.
+
+Until now the only way to refresh predictions was `npm run ingest`, which re-sweeps every league from the
+provider — hundreds of requests against a daily quota — to re-download games that are already in the
+database. Nothing about re-pricing needs the provider: the fit comes from stored results and the
+predictions from stored games.
+
+```
+npm run repredict                   # 20 stalest leagues, all sports
+npm run repredict -- basketball     # one sport
+npm run repredict -- basketball 40  # a bigger batch
+```
+
+**Batched, stalest first.** Fitting a league holds 400 days of its history in memory, so each invocation
+handles a fixed number and stops, letting the memory go back to the operating system in between. Ordering
+is by how stale each league's newest prediction is, so repeated runs rotate through the list rather than
+redoing the same leagues — and a run that reports fewer leagues than the batch has reached the end.
+
+**It cannot rewrite a scored call.** Games inside the lock window are excluded by `rateAndPredictLeague`:
+from fifteen minutes before start the locked call is final, and that is the row the accuracy page scores.
+
 ## 0.14.0 — prune superseded prediction revisions
 
 The scanner is now 1.9s (it was 121, then 147 while I had the fix wrong). This removes the reason the

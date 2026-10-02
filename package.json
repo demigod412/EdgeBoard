@@ -1,6 +1,6 @@
 {
   "name": "edgeboard",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "ingest": "node --max-old-space-size=512 --env-file=.env --conditions=react-server --import tsx scripts/ingest.ts",
     "prune": "node --env-file=.env --conditions=react-server --import tsx scripts/prune.ts",
+    "repredict": "node --max-old-space-size=512 --env-file=.env --conditions=react-server --import tsx scripts/repredict.ts",
     "backtest": "tsx scripts/backtest-synthetic.ts",
     "selfcheck": "node --env-file=.env --conditions=react-server --import tsx scripts/selfcheck.ts",
     "sourcecheck": "node --env-file=.env --conditions=react-server --import tsx scripts/sourcecheck.ts"

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Source } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dataMode } from "@/lib/mode";
-import { gameIncludeLean, HEAVY_JSON, LINE_TAKE_LATEST, BUILDER_LIMIT, perSport } from "@/lib/queries";
+import { attachLatestPredictions, gameBaseInclude, HEAVY_JSON, LINE_TAKE_LATEST, BUILDER_LIMIT, perSport } from "@/lib/queries";
 import { marketsOf } from "@/lib/picks";
 import { GROUP_LABEL, hitOf, type Group } from "@/lib/markets";
 import { buildSlips, legHint, oneInN, SAFE_MAX_LEG_ODDS, type Candidate } from "@/lib/builder";
@@ -50,11 +50,11 @@ export default async function Builder({ params, searchParams }: {
 
   const now = new Date(), end = new Date(now.getTime() + days * DAY);
   const sources = Object.fromEntries(await Promise.all(sports.map(async (s) => [s, (await dataMode(s)).source] as const))) as Record<SportId, Source>;
-  const games = (await Promise.all(sports.map((s) => prisma.game.findMany({
+  const games = await attachLatestPredictions((await Promise.all(sports.map((s) => prisma.game.findMany({
     where: { sport: SPORT_ENUM[s], source: sources[s], status: "SCHEDULED", startUtc: { gt: now, lt: end } },
-    include: { ...gameIncludeLean, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } },
+    include: { ...gameBaseInclude, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } },
     take: perSport(BUILDER_LIMIT, sports.length),
-  })))).flat();
+  })))).flat());
 
   const sportOf = (e: string) => SPORT_IDS.find((s) => SPORT_ENUM[s] === e)!;
   // One small stored row per sport rather than re-reading the ledger on every target change.

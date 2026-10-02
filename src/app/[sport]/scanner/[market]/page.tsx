@@ -50,7 +50,7 @@ export default async function Scanner({ params }: { params: Promise<{ sport: Spo
   }
   // Upset watch: underdog moneyline where the model gives ≥ 5% edge over the bookmaker price
   const upset = (g: (typeof games)[number]): Pick | null => {
-    const v = valueTips(g.predictions[0], latestLines("lines" in g ? g.lines : [])).find((t) => t.kind === "win" && t.p < 0.5 && t.edge >= 0.05);
+    const v = valueTips(g.predictions[0], latestLines(g.lines)).find((t) => t.kind === "win" && t.p < 0.5 && t.edge >= 0.05);
     return v ? { market: "win", side: v.side, line: null, p: v.p, label: `${v.label} @${v.odds.toFixed(2)} (+${Math.round(v.edge * 100)}%)` } : null;
   };
   const hits = games.filter((g) => { const k = def.slug === "upset" ? upset(g) : scan(def.slug as ScannerSlug, g.predictions[0], floors); focus.set(g.id, k); return !!k; })

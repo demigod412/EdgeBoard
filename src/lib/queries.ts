@@ -1,8 +1,9 @@
 import "server-only";
-import type { Prisma } from "@prisma/client";
+import type { MarketLine, Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { dataMode } from "./mode";
 import { SPORT_ENUM, type SportId } from "./sports";
+import type { PredictionSource } from "./picks";
 
 /*
  * ── What a list query must not load ────────────────────────────────────────────────────────────────
@@ -15,23 +16,60 @@ import { SPORT_ENUM, type SportId } from "./sports";
  * going silently missing from every list.
  */
 export const HEAVY_JSON = { ladders: true, rationale: true, features: true } as const;
-// Not `as const`: that makes orderBy a readonly tuple, which Prisma's mutable OrderByInput[] rejects
-// the moment this is spread into an inline include.
 const latestPrediction = { orderBy: [{ lockedAt: { sort: "desc" as const, nulls: "last" as const } }, { revision: "desc" as const }], take: 1 };
 
-/** Everything, for one game. Only the game page should use this. */
+/** Everything, for ONE game. Only the game page should use this — see attachLatestPredictions for why. */
 export const gameInclude = {
   homeTeam: true, awayTeam: true, league: true,
   predictions: latestPrediction,
 } satisfies Prisma.GameInclude;
 
-/** The same without the three unread blobs. What every list and board should use. */
-export const gameIncludeLean = {
-  homeTeam: true, awayTeam: true, league: true,
-  predictions: { ...latestPrediction, omit: HEAVY_JSON },
-} satisfies Prisma.GameInclude;
+/** A game's own relations. No predictions: those are attached separately, deliberately. */
+export const gameBaseInclude = { homeTeam: true, awayTeam: true, league: true } satisfies Prisma.GameInclude;
 
-export type BoardGame = Prisma.GameGetPayload<{ include: typeof gameIncludeLean }>;
+/*
+ * ── Why the latest prediction is fetched separately ────────────────────────────────────────────────
+ *
+ * The obvious way to write this is `include: { predictions: { orderBy: [...], take: 1 } }`, and that is
+ * what every list here used to do. It is a trap at any scale where a game has more than a couple of
+ * revisions.
+ *
+ * Prisma cannot express "the newest row per parent" in SQL through a nested take, so it does not try. It
+ * issues `SELECT <every column> FROM "Prediction" WHERE "gameId" IN ($1..$323)` — no ORDER BY, no LIMIT —
+ * pulls EVERY revision of EVERY game into its query engine, and performs the ordering and the take: 1
+ * there, in memory.
+ *
+ * Measured on a scanner showing 323 games at 23 revisions each: the SQL took 2.0 seconds and the whole
+ * request took 121. The other 119 seconds were the engine sorting and slicing ~7,400 rows it should never
+ * have fetched. It is invisible from the JS side — the heap stayed at 73MB, because the rows were never in
+ * V8 — and invisible in the query log, because the one statement looks cheap and is.
+ *
+ * So the ordering happens here instead: one query for the revisions, one pass to keep the newest per game.
+ * Same SQL cost, and the 119 seconds goes away. If the 2 seconds ever matters, the next step is a raw
+ * `DISTINCT ON ("gameId")`, which would return 323 rows instead of 7,400 — at the price of hand-listing
+ * every column, which is why it is not the first move.
+ */
+export async function attachLatestPredictions<T extends { id: string }>(games: T[]): Promise<(T & { predictions: PredictionSource[] })[]> {
+  if (!games.length) return [];
+  const rows = await prisma.prediction.findMany({
+    where: { gameId: { in: games.map((g) => g.id) } },
+    omit: HEAVY_JSON,
+    orderBy: [{ lockedAt: { sort: "desc", nulls: "last" } }, { revision: "desc" }],
+  });
+  // First row per game wins, because the order above is exactly the precedence the nested take meant.
+  const latest = new Map<string, PredictionSource>();
+  for (const r of rows) if (!latest.has(r.gameId)) latest.set(r.gameId, r);
+  return games.map((g) => {
+    const p = latest.get(g.id);
+    return { ...g, predictions: p ? [p] : [] };
+  });
+}
+
+export type BoardGame = Prisma.GameGetPayload<{ include: typeof gameBaseInclude }> & {
+  predictions: PredictionSource[];
+  /** Always present, empty unless the caller asked for prices. Uniform so no consumer needs a type guard. */
+  lines: MarketLine[];
+};
 
 /*
  * ── Why every line query carries a take ────────────────────────────────────────────────────────────
@@ -86,16 +124,19 @@ export async function getBoard(sport: SportId, o: {
   from: Date; to: Date; leagueId?: string; take?: number; moneyline?: boolean;
 }) {
   const { source } = await dataMode(sport);
-  return prisma.game.findMany({
+  const games = await prisma.game.findMany({
     where: { sport: SPORT_ENUM[sport], source, startUtc: { gte: o.from, lt: o.to }, ...(o.leagueId ? { leagueId: o.leagueId } : {}) },
     include: {
-      ...gameIncludeLean,
+      ...gameBaseInclude,
       // Opt-in, and only the market that asked for it: the upset list needs a price, nothing else does.
-      ...(o.moneyline ? { lines: { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } } : {}),
+      lines: o.moneyline
+        ? { where: { market: "moneyline" }, orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST }
+        : { take: 0 },
     },
     orderBy: { startUtc: "asc" },
     take: o.take ?? BOARD_LIMIT,
   });
+  return attachLatestPredictions(games);
 }
 export async function getLeagues(sport: SportId) {
   const { source } = await dataMode(sport);

@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.13.0 — the 121-second page: Prisma was sorting 7,400 rows in memory
+
+The scanner took **121 seconds** to show 323 games. Postgres accounted for **2** of them.
+
+### What it was
+Every list wrote the latest prediction the obvious way:
+
+```ts
+include: { predictions: { orderBy: [{ lockedAt: "desc" }, { revision: "desc" }], take: 1 } }
+```
+
+Prisma cannot express "the newest row per parent" in SQL through a nested take, and it does not try. The
+query log shows what it does instead:
+
+```
+duration: 2012.635 ms
+SELECT <every column> FROM "Prediction" WHERE "gameId" IN ($1,…,$323)
+```
+
+No `ORDER BY`, no `LIMIT`. It fetches **every revision of every game** — 323 games at 23 revisions each,
+about 7,400 rows — hands them to its query engine, and does the ordering and the `take: 1` there, in
+memory. The SQL cost 2.0 seconds. The in-engine sort and slice cost the other **119**.
+
+This is why it was so hard to see:
+
+| Looked like | Actually |
+| --- | --- |
+| A memory leak — 578MB RSS | JS heap was 73MB; the rows were in the Rust engine, not V8 |
+| A slow query | One statement, 2.0s, perfectly indexed |
+| Too much data | 323 games, 4.6MB of odds, nothing pathological |
+
+It degrades with **revisions per parent**, not total rows, which is why PitchEdge runs the identical
+pattern over 150,551 predictions in 3.3 seconds: it has about one revision per fixture where this has 23.
+
+### The fix
+One query for the revisions, one pass to keep the newest per game — `attachLatestPredictions()`. Same SQL
+cost, and the 119 seconds is gone. Applied to the board, the Top list and the odds builder, which all ran
+the same pattern. The single game page keeps the nested form: 23 rows for one game costs nothing.
+
+If the remaining 2 seconds ever matters, the next step is a raw `DISTINCT ON ("gameId")` returning 323 rows
+instead of 7,400 — at the cost of hand-listing every column, which is why it is not the first move.
+
+### How it was found
+The page timings added in 0.12.2 are what cracked it, after two wrong diagnoses from reading the code. The
+line limits and the index in 0.12.0–0.12.1 were solving a problem this data does not have (15,143 line rows
+in total, 4.6MB); they are harmless and stay, but they were not the fix. The accuracy page fix in 0.12.0
+was real and separate — 1.63GB and OOM-killed, now under a second.
+
 ## 0.12.2 — the pages report their own timings
 
 The scanner renders 317 games from under a megabyte of data and takes ninety seconds doing it, allocating

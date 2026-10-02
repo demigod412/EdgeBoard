@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Source } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dataMode } from "@/lib/mode";
-import { gameIncludeLean, HEAVY_JSON, LINE_TAKE_LATEST, LINE_TAKE_PRELOCK_ALL, BOARD_LIMIT, perSport } from "@/lib/queries";
+import { attachLatestPredictions, gameBaseInclude, HEAVY_JSON, LINE_TAKE_LATEST, LINE_TAKE_PRELOCK_ALL, BOARD_LIMIT, perSport } from "@/lib/queries";
 import { selectTop, tipsFor, TOP_N, WINDOWS, type Tip } from "@/lib/top";
 import { flatStakeRoi, latestLines, selectTopValue, valueTips, VALUE, type ValueTip } from "@/lib/value";
 import { GROUP_LABEL, hitOf, TOP_CAPS, type Group } from "@/lib/markets";
@@ -40,12 +40,13 @@ export default async function Top({ params, searchParams }: { params: Promise<{ 
     return `/${sport}/top?${q}`;
   };
 
-  const games = (await Promise.all(sports.map((s) => prisma.game.findMany({
+  // The latest prediction is attached separately, never as a nested take: see attachLatestPredictions.
+  const games = await attachLatestPredictions((await Promise.all(sports.map((s) => prisma.game.findMany({
     where: { sport: SPORT_ENUM[s], source: sources[s], status: "SCHEDULED", startUtc: { gt: now, lt: end } },
     // Upcoming: latestLines() is called without a cutoff here, so only the newest row per market is read.
-    include: { ...gameIncludeLean, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } },
+    include: { ...gameBaseInclude, lines: { orderBy: { fetchedAt: "desc" }, take: LINE_TAKE_LATEST } },
     take: perSport(BOARD_LIMIT, sports.length),
-  })))).flat();
+  })))).flat());
 
   let likely: { g: (typeof games)[number]; t: Tip }[] = [], value: { g: (typeof games)[number]; t: ValueTip }[] = [];
   if (list === "likely") {

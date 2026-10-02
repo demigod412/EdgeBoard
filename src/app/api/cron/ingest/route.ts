@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getProvider } from "@/lib/providers";
 import { ingest } from "@/lib/pipeline/ingest";
 import { lockDue, settle, syncResults } from "@/lib/pipeline/ledger";
+import { prunePredictions } from "@/lib/pipeline/prune";
 import { SPORT_IDS, isSport } from "@/lib/sports";
 
 export const maxDuration = 300;
@@ -17,6 +18,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url), job = url.searchParams.get("job"), s = url.searchParams.get("sport") ?? "";
   const sports = isSport(s) ? [s] : SPORT_IDS;
   if (job === "lock") return NextResponse.json({ ok: true, locked: await lockDue(prisma) });
+  // Nightly: drop superseded unlocked revisions. Locked rows are never candidates — see prune.ts.
+  if (job === "prune") return NextResponse.json({ ok: true, pruned: await prunePredictions(prisma) });
   const out: Record<string, unknown> = {};
   for (const sp of sports) {
     const p = await getProvider(sp);

@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.14.0 — prune superseded prediction revisions
+
+The scanner is now 1.9s (it was 121, then 147 while I had the fix wrong). This removes the reason the
+remaining 1.3s exists at all.
+
+### The cost being removed
+Predictions are append-only: a sync that changes a game's inputs writes a new revision instead of editing
+the old one. That is the right design — a call that was shown has to stay recoverable — but a game
+accumulates revisions for as long as it sits in the upcoming window. Measured here: **18.7 per game on
+average, 73 at the worst**.
+
+Finding "the newest revision per game" therefore scans every revision of every game in the window, because
+there is no way to know which is newest without looking. Nineteen rows read per row used.
+
+### What is never deleted
+**Any revision with `lockedAt` set.** Those are the ledger — the call exactly as it stood fifteen minutes
+before kickoff, which is the only thing the accuracy page scores. The delete filters on
+`WHERE "lockedAt" IS NULL`, so a locked row cannot be selected as a candidate at all, and the script
+re-counts locked rows afterwards and says so explicitly.
+
+Beyond that the newest **3** unlocked revisions per game survive, so the current call and a little history
+behind it are always there. Change it with `PREDICTION_KEEP_REVISIONS` or `--keep`.
+
+### Running it
+Reporting is the default. `--apply` is required, because this is the only maintenance job here that
+destroys rows:
+
+```
+npm run prune                     # what it would delete, deletes nothing
+npm run prune -- --apply          # do it
+npm run prune -- --apply --keep 5 # keep more history
+```
+
+It also runs nightly at 04:40 (`?job=prune`), so the table stays small instead of being cleaned up once.
+Deletes go in batches of 5,000 so a first run on a large backlog is not one enormous transaction.
+
+One window function in one statement, rather than one query per game — which is the pathology this is
+meant to relieve, so doing it that way would have been absurd.
+
 ## 0.13.1 — fetch 323 rows, not 7,400
 
 0.13.0 identified the right culprit and applied the wrong fix. It is worth being precise about why,

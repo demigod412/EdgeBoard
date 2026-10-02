@@ -3,5 +3,6 @@
   { "path": "/api/cron/ingest?sport=baseball", "schedule": "20 */3 * * *" },
   { "path": "/api/cron/ingest?sport=hockey", "schedule": "30 */3 * * *" },
   { "path": "/api/cron/ingest?job=lock", "schedule": "*/5 * * * *" },
-  { "path": "/api/cron/ingest?job=results", "schedule": "4,19,34,49 * * * *" }
+  { "path": "/api/cron/ingest?job=results", "schedule": "4,19,34,49 * * * *" },
+  { "path": "/api/cron/ingest?job=prune", "schedule": "40 4 * * *" }
 ] }

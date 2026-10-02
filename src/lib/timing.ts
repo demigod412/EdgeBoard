@@ -12,17 +12,25 @@
 export function phases(label: string) {
   const t0 = Date.now();
   let last = t0;
-  const marks: string[] = [];
+  const mem = () => {
+    const m = process.memoryUsage();
+    return `rss=${Math.round(m.rss / 1048576)}MB heap=${Math.round(m.heapUsed / 1048576)}MB`;
+  };
+  /*
+   * Each mark prints as it happens rather than being collected for one line at the end.
+   *
+   * The first version buffered and printed once on completion, and the first request that mattered was
+   * OOM-killed — which discards whatever Node had buffered for stderr, so the only diagnostic for the
+   * only interesting run was lost. Breadcrumbs that survive the process are worth more than a tidy line.
+   */
   return {
     mark(name: string, extra?: string) {
       const now = Date.now();
-      marks.push(`${name}=${now - last}ms${extra ? `(${extra})` : ""}`);
+      console.error(`[timing] ${label} ${name}=${now - last}ms${extra ? ` (${extra})` : ""} at=${now - t0}ms ${mem()}`);
       last = now;
     },
     done(extra?: string) {
-      const rss = Math.round(process.memoryUsage().rss / 1048576);
-      const heap = Math.round(process.memoryUsage().heapUsed / 1048576);
-      console.error(`[timing] ${label} ${marks.join(" ")} total=${Date.now() - t0}ms rss=${rss}MB heap=${heap}MB${extra ? ` ${extra}` : ""}`);
+      console.error(`[timing] ${label} DONE total=${Date.now() - t0}ms ${mem()}${extra ? ` ${extra}` : ""}`);
     },
   };
 }

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.13.1 — fetch 323 rows, not 7,400
+
+0.13.0 identified the right culprit and applied the wrong fix. It is worth being precise about why,
+because the distinction is the whole problem.
+
+The nested `predictions: { take: 1, orderBy: ... }` makes Prisma fetch **every revision of every game** —
+7,400 rows to use 323 — and sort them inside its query engine. 0.13.0 moved that sort into JavaScript,
+assuming the engine's in-memory sort was the expense. It was not. The expense is **fetching 7,400 rows**,
+and in JS those rows are worse: `picks` is 2.8KB each, so ~21MB of JSON gets parsed into objects. The page
+went from 121 seconds to 147 and then OOM-killed the service twice.
+
+### What it does now
+Two steps instead of one:
+
+1. **Pick the winners** with four tiny columns — `id`, `gameId`, `lockedAt`, `revision`. All 7,400
+   revisions are still scanned, because there is no way to know which is newest without looking, but at
+   about a hundred bytes a row that is under a megabyte and touches no Json.
+2. **Fetch the full rows for exactly those 323 ids.** `omit` rather than a select list, so a column added
+   later is still carried automatically.
+
+Two round trips, two orders of magnitude less data.
+
+### Timings now print as they happen
+The one request that mattered was OOM-killed, and a kill discards Node's buffered stderr — so the only
+diagnostic for the only interesting run was lost, which is why 0.13.0's output showed nothing. Each phase
+now prints immediately, with rss and heap at that moment. Breadcrumbs that survive the process beat a tidy
+single line.
+
+### Worth looking at separately
+Games carry **18.7 prediction revisions on average, 73 at the maximum**. That is append-only by design and
+not itself a fault, but every list query pays for it on the lookup above. Pruning superseded revisions
+beyond the most recent few would cut that scan to almost nothing.
+
 ## 0.13.0 — the 121-second page: Prisma was sorting 7,400 rows in memory
 
 The scanner took **121 seconds** to show 323 games. Postgres accounted for **2** of them.

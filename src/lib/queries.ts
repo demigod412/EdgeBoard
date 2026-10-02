@@ -44,23 +44,47 @@ export const gameBaseInclude = { homeTeam: true, awayTeam: true, league: true } 
  * have fetched. It is invisible from the JS side — the heap stayed at 73MB, because the rows were never in
  * V8 — and invisible in the query log, because the one statement looks cheap and is.
  *
- * So the ordering happens here instead: one query for the revisions, one pass to keep the newest per game.
- * Same SQL cost, and the 119 seconds goes away. If the 2 seconds ever matters, the next step is a raw
- * `DISTINCT ON ("gameId")`, which would return 323 rows instead of 7,400 — at the price of hand-listing
- * every column, which is why it is not the first move.
+ * Moving that same fetch into JS does NOT fix it, which was the first attempt here: the rows then cross
+ * into V8 and `picks` (2.8KB each, ~21MB across 7,400 rows) gets parsed into objects, which traded 119
+ * seconds of engine sorting for an out-of-memory kill. The cost was never where the sorting happened. It
+ * was fetching 7,400 rows to use 323 of them.
+ *
+ * So this does it in two steps. First the winners, selecting only id/gameId/lockedAt/revision — every
+ * revision is still scanned, because there is no way to know which is newest without looking, but at
+ * about a hundred bytes a row that is under a megabyte and touches no Json. Then the full rows for
+ * exactly those 323 ids.
+ *
+ * Two round trips instead of one, and two orders of magnitude less data.
  */
 export async function attachLatestPredictions<T extends { id: string }>(games: T[]): Promise<(T & { predictions: PredictionSource[] })[]> {
   if (!games.length) return [];
-  const rows = await prisma.prediction.findMany({
-    where: { gameId: { in: games.map((g) => g.id) } },
-    omit: HEAVY_JSON,
+  const gameIds = games.map((g) => g.id);
+
+  /*
+   * Step one picks the winners using four tiny columns. All ~7,400 revisions are still scanned — there is
+   * no way to know which is newest without looking — but at roughly a hundred bytes a row that is under a
+   * megabyte, and no Json is touched.
+   */
+  const keys = await prisma.prediction.findMany({
+    where: { gameId: { in: gameIds } },
+    select: { id: true, gameId: true, lockedAt: true, revision: true },
     orderBy: [{ lockedAt: { sort: "desc", nulls: "last" } }, { revision: "desc" }],
   });
-  // First row per game wins, because the order above is exactly the precedence the nested take meant.
-  const latest = new Map<string, PredictionSource>();
-  for (const r of rows) if (!latest.has(r.gameId)) latest.set(r.gameId, r);
+  const winner = new Map<string, string>();
+  for (const k of keys) if (!winner.has(k.gameId)) winner.set(k.gameId, k.id);
+
+  /*
+   * Step two fetches the full rows for exactly those ids — 323 rows, not 7,400. `omit` rather than a
+   * select list, so a column added later is carried automatically.
+   */
+  const rows = winner.size
+    ? await prisma.prediction.findMany({ where: { id: { in: [...winner.values()] } }, omit: HEAVY_JSON })
+    : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+
   return games.map((g) => {
-    const p = latest.get(g.id);
+    const id = winner.get(g.id);
+    const p = id ? byId.get(id) : undefined;
     return { ...g, predictions: p ? [p] : [] };
   });
 }
